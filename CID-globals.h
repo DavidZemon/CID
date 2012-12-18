@@ -74,6 +74,7 @@
 // Error codes -- Numbers chosen for legibility during serial output
 #define INCORRECT_FIFO_SIZE	7
 #define BUFFER_FULL			15
+#define BUFFER_EMPTY		3
 
 /************************
  *** Global Variables ***

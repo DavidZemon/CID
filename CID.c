@@ -17,7 +17,19 @@ void main (void) {
 }
 
 void write_isr (void) {
+	/* Description: Interrupt service routine for Timer;
+	 * 				Write g_out_buffer to SPI (make sound through the DAC!)
+	 */
 
+	if (0 == g_out_bufSize)
+		soundAlarm(BUFFER_EMPTY, EMPTY);
+	else {
+		SSIDataPutNonBlocking(DAC_SSI_BASE, g_out_buffer[g_rd_out_idx++] << 2);
+		if (BUFFER_SIZE == g_rd_out_idx)
+			// If the pointer points past the end of the buffer, reset to beginning
+			g_rd_out_idx = 0;
+		g_out_bufSize--;
+	}
 }
 
 void adc_isr (void) {
@@ -71,6 +83,9 @@ void soundAlarm (const unsigned char alarm, const int arg) {
 	unsigned short moddedAlarm = alarm;
 	unsigned long moddedArg = arg;
 	unsigned long output;
+
+	// Kill all interrupts
+	IntMasterDisable(true);
 
 	while (1) {
 		moddedAlarm = alarm;
