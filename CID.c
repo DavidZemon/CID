@@ -3,10 +3,6 @@
  * Author:  David Zemon & Anthony DiGuida
  */
 
-/* Random comments!!! Yaayyy!!!
- *
- */
-
 #include "CID.h"
 
 void main (void) {
