@@ -78,10 +78,14 @@
 /************************
  *** Global Variables ***
  ************************/
-extern unsigned int g_rd_buffer[AXES][BUFFER_SIZE];
-extern unsigned int g_wr_buffer[BUFFER_SIZE];
-extern unsigned short g_bufSize;
-extern unsigned char g_wr_idx;
-extern unsigned char g_rd_idx;				// Read index initialized to EMPTY
+extern unsigned int **g_in_buffer;
+extern unsigned short g_in_bufSize;
+extern unsigned char g_wr_in_idx;
+extern unsigned char g_rd_in_idx;				// Read index initialized to EMPTY
+
+extern unsigned int g_out_buffer[BUFFER_SIZE];
+extern unsigned short g_out_bufSize;
+extern unsigned char g_wr_out_idx;
+extern unsigned char g_rd_out_idx;				// Read index initialized to EMPTY
 
 #endif /* CID_GLOBALS_H_ */

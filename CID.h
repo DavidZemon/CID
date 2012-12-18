@@ -31,6 +31,7 @@
 
 #include "CID-globals.h"
 #include <math.h>
+#include <stdlib.h>
 
 /**********************************
  *** Interrupt Service Routines ***
@@ -41,6 +42,9 @@ void adc_isr (void);
 /*************************
  *** General functions ***
  *************************/
+void dataProcessor (unsigned int **in_buffer, unsigned short in_width,
+		unsigned short in_len, unsigned short in_idx, unsigned int *out_buffer,
+		unsigned short out_len, unsigned short out_idx);
 void soundAlarm (const unsigned char alarm, const int arg);
 
 #ifdef DEBUG
@@ -50,12 +54,7 @@ void __error__(char *pcFilename, unsigned long ulLine) {}
 /********************************
  *** Initialization functions ***
  ********************************/
-/* Description: Initiate clock and call other init functions
- */
-void hdwrInit (void);
-
-/* Description: Set timer to at trigger at RD_FREQ Hz
- */
+void sysInit (void);
 void rdTmrInit (void);
 void adcInit (void);
 void spiInit (void);

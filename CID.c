@@ -6,12 +6,14 @@
 #include "CID.h"
 
 void main (void) {
-	hdwrInit();
+	sysInit();
 
 	SSIDataPutNonBlocking(DAC_SSI_BASE, 0x3ff << 2);
 
-	while (1) {
-	}
+	while (1)
+		if (g_in_bufSize)
+			dataProcessor(g_in_buffer, AXES, BUFFER_SIZE, g_rd_in_idx, g_out_buffer,
+					BUFFER_SIZE, g_wr_out_idx);
 }
 
 void write_isr (void) {
@@ -25,7 +27,7 @@ void adc_isr (void) {
 	ADCIntClear(ADC0_BASE + ACCEL_ADC, SEQUENCE);
 
 	// Check buffer size - if it's full, sound the alarm
-	if (BUFFER_SIZE == g_bufSize)
+	if (BUFFER_SIZE == g_in_bufSize)
 		soundAlarm(BUFFER_FULL, EMPTY); // Holding function - execution will never return
 
 	// Move newest values to end of buffer
@@ -33,12 +35,35 @@ void adc_isr (void) {
 
 	unsigned short axis;
 	for (axis = X; axis < AXES; ++axis)
-		g_rd_buffer[axis][g_wr_idx] = tempBuffer[axis];
+		g_in_buffer[axis][g_wr_in_idx] = tempBuffer[axis];
 
-	if (BUFFER_SIZE == ++g_wr_idx)
-		g_wr_idx = 0;
+	if (BUFFER_SIZE == ++g_wr_in_idx)
+		g_wr_in_idx = 0;
 
-	++g_bufSize;
+	++g_in_bufSize;
+}
+
+void dataProcessor (unsigned int **in_buffer, unsigned short in_width,
+		unsigned short in_len, unsigned short in_idx, unsigned int *out_buffer,
+		unsigned short out_len, unsigned short out_idx) {
+	/* Description: Perform signal processing on the input buffer to generate an output buffer
+	 *
+	 * Precondition: Input buffer must have the same length (number of rows) for each column
+	 *
+	 * @param	**in_buffer		2D circular buffers containing input signals
+	 * @param	in_width		Width of the input buffer/Number of columns
+	 * @param	in_len			Length of the input buffers/Number of rows
+	 * @param	in_idx			Index at which to begin reading data from the input buffer
+	 *
+	 * @param	*out_buffer		1D circular buffer containing the output buffer (ready for
+	 * 							single-channel audio output)
+	 * @param	out_len			Length of the output buffer/Number of rows
+	 * @param	out_idx			Index at which to begin writing data for the output buffer
+	 *
+	 * @return		None
+	 */
+
+
 }
 
 void soundAlarm (const unsigned char alarm, const int arg) {
@@ -66,15 +91,26 @@ void soundAlarm (const unsigned char alarm, const int arg) {
 }
 
 void sysInit (void) {
+	/* Description: Initiate clock and call other init functions
+	 */
+
 	// Enable system clock for 50 MHz
 	SysCtlClockSet(
 			SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
 
-	// Clear the buffer
+
+	// Allocate and clear the input buffer
 	unsigned short axis, i;
-	for (axis = X; axis < Z + 1; ++axis)
+	g_in_buffer = (unsigned int **) malloc(AXES * sizeof(unsigned int *));
+	for (axis = X; axis < AXES; ++axis) {
+		g_in_buffer[axis] = (unsigned int *) malloc(BUFFER_SIZE * sizeof(unsigned int));
 		for (i = 0; i < BUFFER_SIZE; ++i)
-			g_rd_buffer[axis][i] = EMPTY;
+			g_in_buffer[axis][i] = EMPTY;
+	}
+
+	// Clear the output buffer
+	for (i = 0; i < BUFFER_SIZE; ++i)
+		g_out_buffer[i] = EMPTY;
 
 	// Initialize the timer, ADC, and SPI comm
 	rdTmrInit();
@@ -85,6 +121,9 @@ void sysInit (void) {
 }
 
 void rdTmrInit (void) {
+	/* Description: Set timer to at trigger at RD_FREQ Hz
+	 */
+
 	// Calculate the timer delay
 	unsigned int delay = SysCtlClockGet() / RD_FREQ;
 
