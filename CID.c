@@ -11,8 +11,11 @@ void main (void) {
 	SSIDataPutNonBlocking(DAC_SSI_BASE, 0x3ff << 2);
 
 	while (1) {
-
 	}
+}
+
+void write_isr (void) {
+
 }
 
 void adc_isr (void) {
@@ -30,7 +33,7 @@ void adc_isr (void) {
 
 	unsigned short axis;
 	for (axis = X; axis < AXES; ++axis)
-		g_buffer[axis][g_wr_idx] = tempBuffer[axis];
+		g_rd_buffer[axis][g_wr_idx] = tempBuffer[axis];
 
 	if (BUFFER_SIZE == ++g_wr_idx)
 		g_wr_idx = 0;
@@ -62,7 +65,7 @@ void soundAlarm (const unsigned char alarm, const int arg) {
 	}
 }
 
-void hdwrInit (void) {
+void sysInit (void) {
 	// Enable system clock for 50 MHz
 	SysCtlClockSet(
 			SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
@@ -71,17 +74,17 @@ void hdwrInit (void) {
 	unsigned short axis, i;
 	for (axis = X; axis < Z + 1; ++axis)
 		for (i = 0; i < BUFFER_SIZE; ++i)
-			g_buffer[axis][i] = EMPTY;
+			g_rd_buffer[axis][i] = EMPTY;
 
 	// Initialize the timer, ADC, and SPI comm
-	tmrInit();
+	rdTmrInit();
 	adcInit();
 	spiInit();
 
 	IntMasterEnable();
 }
 
-void tmrInit (void) {
+void rdTmrInit (void) {
 	// Calculate the timer delay
 	unsigned int delay = SysCtlClockGet() / RD_FREQ;
 
@@ -105,14 +108,14 @@ void tmrInit (void) {
 }
 
 void adcInit (void) {
-	// Enable clock to Port E
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0 + ACCEL_ADC);
+	// Enable clock to accelerometer's GPIO port and ADC
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
+	SysCtlPeripheralEnable(ACCEL_SYSCTL);
 
 	// Connect pins to the ADC that are connected to the accelerometer
-	GPIOPinTypeADC(ACCEL_PORT_BASE, X_PIN | Y_PIN | Z_PIN);
-
-	// Enable clock to the ADCn
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0 + ACCEL_ADC);
+	GPIODirModeSet(ACCEL_PORT_BASE, X_PIN | Y_PIN | Z_PIN, GPIO_DIR_MODE_IN);
+	GPIOPadConfigSet(ACCEL_PORT_BASE, X_PIN | Y_PIN | Z_PIN, GPIO_STRENGTH_2MA,
+			GPIO_PIN_TYPE_ANALOG);
 
 	// Set ADC0's sequence "SEQUENCE" to always (constantly) trigger
 	// and give it interrupt priority 1 (second-highest - data output is more important)
@@ -146,7 +149,8 @@ void spiInit (void) {
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA + DAC_GPIO_PORT - 'A'); // Char add/subtract allows for easy port switching
 
 	// Set pins for use by SSI module
-	GPIOPinTypeSSI(GPIO_PORTA_BASE + DAC_GPIO_PORT - 'A', DAC_CLK_PIN | DAC_FSS_PIN | DAC_TX_PIN);
+	GPIOPinTypeSSI(GPIO_PORTA_BASE + DAC_GPIO_PORT - 'A',
+			DAC_CLK_PIN | DAC_FSS_PIN | DAC_TX_PIN);
 
 	// Set pin MUXes within the SSI module
 	GPIOPinConfigure(DAC_CLK_PIN_CFG);
@@ -154,7 +158,8 @@ void spiInit (void) {
 	GPIOPinConfigure(DAC_TX_PIN_CFG);
 
 	// Configure tons o' settings for SPI/SSI
-	SSIConfigSetExpClk(DAC_SSI_BASE, SysCtlClockGet(), SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, SSI_BITRATE, SSI_BIT_WIDTH);
+	SSIConfigSetExpClk(DAC_SSI_BASE, SysCtlClockGet(), SSI_FRF_MOTO_MODE_0,
+			SSI_MODE_MASTER, SSI_BITRATE, SSI_BIT_WIDTH);
 
 	SSIEnable(DAC_SSI_BASE);
 }
@@ -168,4 +173,33 @@ void alarmInit (void) {
 	// Param1: Port G
 	// Param2: Pin 2 (0 indexed)
 	GPIOPinTypeGPIOOutput(ALARM_PORT_BASE, ALARM_PIN);
+}
+
+void wrTmrInit (void) {
+	// Calculate delay between writeing to the DAC
+	unsigned int delay = SysCtlClockGet() / WR_FREQ;
+
+	// Enable clock to timer1
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
+
+	// Set timer1 for periodic
+	TimerConfigure(TIMER1_BASE, TIMER_CFG_A_PERIODIC);
+
+	// Stall timer during debug
+	TimerControlStall(TIMER1_BASE, TIMER_A, 1);
+
+	// Load timer with delay
+	TimerLoadSet(TIMER1_BASE, TIMER_A, delay);
+
+	// Register the ISR
+	TimerIntRegister(TIMER1_BASE, TIMER_A, write_isr);
+
+	// Enable timer1's interrupts
+	TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+
+	// Enable timer interrupts
+	IntEnable(INT_TIMER1A);
+
+	// Turn on the timer
+	TimerEnable(TIMER1_BASE, TIMER_A);
 }
