@@ -96,7 +96,7 @@ void dataProcessor (const unsigned short newPts, IN_BUFF_TYPE **in_buffer,
 		// TODO: What if (in_row + i >= BUFFER_SIZE)
 	}
 
-	// TODO: Do stuff
+	// TODO: Double integral of acceleration to find position
 
 	// Remove consumed data
 }
