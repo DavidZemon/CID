@@ -8,12 +8,10 @@
 void main (void) {
 	sysInit();
 
-	SSIDataPutNonBlocking(DAC_SSI_BASE, 0x3ff << 2);
-
 	while (1)
 		if (g_in_bufSize)
-			dataProcessor(g_in_buffer, AXES, BUFFER_SIZE, g_rd_in_idx, g_out_buffer,
-					BUFFER_SIZE, g_wr_out_idx);
+			dataProcessor(g_in_bufSize, g_in_buffer, AXES, BUFFER_SIZE, g_rd_in_idx,
+					g_out_buffer, BUFFER_SIZE, g_wr_out_idx);
 }
 
 void write_isr (void) {
@@ -33,32 +31,37 @@ void write_isr (void) {
 }
 
 void adc_isr (void) {
-	unsigned long tempBuffer[AXES]; // Temporary buffer capable of holding 5 sequences
+	IN_BUFF_TYPE tempBuffer[AXES]; // Temporary buffer capable of holding 5 sequences
 
 	// Clear the interrupt flag
 	ADCIntClear(ADC0_BASE + ACCEL_ADC, SEQUENCE);
 
 	// Check buffer size - if it's full, sound the alarm
+	// TODO: After ensuring this never happens, change it to a while loop to prevent
+	//		 killing the program on the off-chance that it does
 	if (BUFFER_SIZE == g_in_bufSize)
 		soundAlarm(BUFFER_FULL, EMPTY); // Holding function - execution will never return
 
-	// Move newest values to end of buffer
-	ADCSequenceDataGet(ADC0_BASE + ACCEL_ADC, SEQUENCE, tempBuffer);
+	// Retrieve data from ADC's FIFO
+	ADCSequenceDataGet(ADC0_BASE + ACCEL_ADC, SEQUENCE, (unsigned long *) tempBuffer);
 
+	// Place insert data into global buffer
 	unsigned short axis;
 	for (axis = X; axis < AXES; ++axis)
 		g_in_buffer[axis][g_wr_in_idx] = tempBuffer[axis];
 
+	// Loop the write pointer if it has reached the end of the buffer
 	if (BUFFER_SIZE == ++g_wr_in_idx)
 		g_wr_in_idx = 0;
 
 	++g_in_bufSize;
 }
 
-void dataProcessor (unsigned int **in_buffer, unsigned short in_width,
-		unsigned short in_len, unsigned short in_idx, unsigned int *out_buffer,
-		unsigned short out_len, unsigned short out_idx) {
+void dataProcessor (const unsigned short newPts, IN_BUFF_TYPE **in_buffer,
+		const unsigned short in_width, const unsigned short in_len, unsigned short in_row,
+		OUT_BUFF_TYPE *out_buffer, const unsigned short out_len, unsigned short out_row) {
 	/* Description: Perform signal processing on the input buffer to generate an output buffer
+	 * 				TODO: What kind of signal processing?
 	 *
 	 * Precondition: Input buffer must have the same length (number of rows) for each column
 	 *
@@ -75,7 +78,27 @@ void dataProcessor (unsigned int **in_buffer, unsigned short in_width,
 	 * @return		None
 	 */
 
+	// TODO: Can in_idx and out_idx be set as constants? It may be useful to allow for change
+	//		 as this function evolves
+	static IN_BUFF_TYPE min;
+	static IN_BUFF_TYPE max;
 
+	// For each new data point, find out if the min and max points should be extended
+	// Note: All columns have the same min and max values
+	unsigned short col, i;
+	for (i = 0; i < newPts; ++i) {
+		for (col = 0; col < in_width; ++col) {
+			if (max < in_buffer[col][in_row + i])
+				max = in_buffer[col][in_row + i];
+			else if (min > in_buffer[col][in_row + i])
+				min = in_buffer[col][in_row + i];
+		}
+		// TODO: What if (in_row + i >= BUFFER_SIZE)
+	}
+
+	// TODO: Do stuff
+
+	// Remove consumed data
 }
 
 void soundAlarm (const unsigned char alarm, const int arg) {
@@ -85,7 +108,7 @@ void soundAlarm (const unsigned char alarm, const int arg) {
 	unsigned long output;
 
 	// Kill all interrupts
-	IntMasterDisable(true);
+	IntMasterDisable();
 
 	while (1) {
 		moddedAlarm = alarm;
@@ -112,7 +135,6 @@ void sysInit (void) {
 	// Enable system clock for 50 MHz
 	SysCtlClockSet(
 			SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
-
 
 	// Allocate and clear the input buffer
 	unsigned short axis, i;

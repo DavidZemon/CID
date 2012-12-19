@@ -28,6 +28,8 @@
 #define Z_PIN				GPIO_PIN_6
 
 // Buffer
+#define IN_BUFF_TYPE		unsigned int
+#define OUT_BUFF_TYPE		unsigned short
 #define BUFFER_SIZE 		5				// Sample buffer size
 #define EMPTY				-1				// -1 will represent an empty field
 #define AXES				3				// There are 3 axes between X, Y, and Z
@@ -79,14 +81,14 @@
 /************************
  *** Global Variables ***
  ************************/
-extern unsigned int **g_in_buffer;
+extern IN_BUFF_TYPE **g_in_buffer;
 extern unsigned short g_in_bufSize;
-extern unsigned char g_wr_in_idx;
-extern unsigned char g_rd_in_idx;				// Read index initialized to EMPTY
+extern unsigned short g_wr_in_idx;
+extern unsigned short g_rd_in_idx;				// Read index initialized to EMPTY
 
-extern unsigned int g_out_buffer[BUFFER_SIZE];
+extern OUT_BUFF_TYPE g_out_buffer[BUFFER_SIZE];
 extern unsigned short g_out_bufSize;
-extern unsigned char g_wr_out_idx;
-extern unsigned char g_rd_out_idx;				// Read index initialized to EMPTY
+extern unsigned short g_wr_out_idx;
+extern unsigned short g_rd_out_idx;				// Read index initialized to EMPTY
 
 #endif /* CID_GLOBALS_H_ */

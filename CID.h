@@ -42,11 +42,10 @@ void adc_isr (void);
 /*************************
  *** General functions ***
  *************************/
-void dataProcessor (unsigned int **in_buffer, unsigned short in_width,
-		unsigned short in_len, unsigned short in_idx, unsigned int *out_buffer,
-		unsigned short out_len, unsigned short out_idx);
+void dataProcessor (const unsigned short newPts, IN_BUFF_TYPE **in_buffer,
+		const unsigned short in_width, const unsigned short in_len, unsigned short in_idx,
+		OUT_BUFF_TYPE *out_buffer, const unsigned short out_len, unsigned short out_idx);
 void soundAlarm (const unsigned char alarm, const int arg);
-
 #ifdef DEBUG
 void __error__(char *pcFilename, unsigned long ulLine) {}
 #endif
