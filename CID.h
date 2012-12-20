@@ -36,15 +36,17 @@
 /**********************************
  *** Interrupt Service Routines ***
  **********************************/
-void write_isr (void);
+void write_out_isr (void);
 void adc_isr (void);
 
 /*************************
  *** General functions ***
  *************************/
-void dataProcessor (const unsigned short newPts, IN_BUFF_TYPE **in_buffer,
-		const unsigned short in_width, const unsigned short in_len, unsigned short in_idx,
-		OUT_BUFF_TYPE *out_buffer, const unsigned short out_len, unsigned short out_idx);
+void dataProcessor (const unsigned short newPts, struct buffer_in *input,
+		const unsigned short in_width, const unsigned short in_len,
+		struct buffer_out *output, const unsigned short out_len);
+OUT_BUFF_TYPE waveGenerator (const unsigned int freq, const float amp,
+		const OUT_BUFF_TYPE peakAmp, float *phase);
 void soundAlarm (const unsigned char alarm, const int arg);
 #ifdef DEBUG
 void __error__(char *pcFilename, unsigned long ulLine) {}
