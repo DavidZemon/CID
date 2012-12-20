@@ -67,7 +67,6 @@
 // SPI Software
 #define WR_FREQ				25000			// Write to the DAC at 25 kHz
 #define MAX_OUTPUT			0x3ff			// 12-bit maximum for the DAC
-
 // Floating point/Trig
 #ifndef M_PI
 #define M_PI				3.14159265358979323846F // Provide a definition for M_PI, if it was not provided by math.h.

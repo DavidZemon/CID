@@ -10,8 +10,8 @@ void main (void) {
 
 	while (1)
 		if (g_buffer_in.size >= RD_FREQ / WR_FREQ)
-			dataProcessor(g_buffer_in.size, &g_buffer_in, AXES, BUFFER_SIZE, &g_buffer_out,
-					BUFFER_SIZE);
+			dataProcessor(g_buffer_in.size, &g_buffer_in, AXES, BUFFER_SIZE,
+					&g_buffer_out, BUFFER_SIZE);
 }
 
 void write_out_isr (void) {
