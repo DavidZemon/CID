@@ -97,6 +97,7 @@ void dataProcessor (const unsigned short newPts, IN_BUFF_TYPE **in_buffer,
 	}
 
 	// TODO: Double integral of acceleration to find position
+	dspRead();
 
 	// Remove consumed data
 }
@@ -278,4 +279,22 @@ void wrTmrInit (void) {
 
 	// Turn on the timer
 	TimerEnable(TIMER1_BASE, TIMER_A);
+}
+
+void dspRead (void) {
+	/* x axis: 		acceleration
+	 * 				above a certain threshold -> trigger / create a beat
+	 * y & z axis:	acceleration --double integral--> position from origin
+	 * 				modulate frequency and amplitude based on pos
+	 */
+	unsigned int beat_accel = g_in_buffer[BEAT_AXIS][g_rd_in_idx];
+	unsigned int freq_accel = g_in_buffer[FREQ_AXIS][g_rd_in_idx];
+	unsigned int amp_accel = g_in_buffer[AMP_AXIS][g_rd_in_idx++];
+
+	static unsigned int freq_velo = freq_velo + freq_accel;
+	static unsigned int amp_velo = amp_velo + amp_accel;
+
+
+
+
 }

@@ -37,6 +37,13 @@
 #define Y					1
 #define Z					2
 
+// DSP calculation
+#define BEAT_AXIS			X
+#define FREQ_AXIS			Y
+#define AMP_AXIS			Z
+#define FREQ_POS_BASE		261.63
+#define AMP_POS_BASE		10
+
 // Alarm
 #define ALARM_SYSCTL		SYSCTL_PERIPH_GPIOG
 #define ALARM_PORT_BASE		GPIO_PORTG_BASE
@@ -90,5 +97,7 @@ extern OUT_BUFF_TYPE g_out_buffer[BUFFER_SIZE];
 extern unsigned short g_out_bufSize;
 extern unsigned short g_wr_out_idx;
 extern unsigned short g_rd_out_idx;				// Read index initialized to EMPTY
+
+extern
 
 #endif /* CID_GLOBALS_H_ */
