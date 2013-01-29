@@ -348,40 +348,26 @@ void wrTmrInit (void) {
 	TimerEnable(TIMER1_BASE, TIMER_A);
 }
 
-void dspRead (void) {
-	/* x axis: 		acceleration
-	 * 				above a certain threshold -> trigger / create a beat
-	 * y & z axis:	acceleration --double integral--> position from origin
-	 * 				modulate frequency and amplitude based on pos
-	 */
-	uint32 beat_accel = g_in_buffer[BEAT_AXIS][g_rd_in_idx];
-	uint32 freq_accel = g_in_buffer[FREQ_AXIS][g_rd_in_idx];
-	uint32 amp_accel = g_in_buffer[AMP_AXIS][g_rd_in_idx++];
-
-	static uint32 freq_velo = freq_velo + freq_accel;
-	static uint32 amp_velo = amp_velo + amp_accel;
-
-}
-
-void highPass (buffer_in input) {
+void highPass (buffer_filter input, buffer_filter hpf) {
 	/* Filter accelerometer data for improved accuracy during integration
 	 * Calculates most recent high pass filter (HPF) output
 	 * based on previous HPF output sample and current and previous filter input samples
 	 */
-	if (0 == g_buffer_hipass.wr_ptr)
-		g_buffer_hipass.wr_ptr = 0;
+	uint8 curr_smpl = hpf.wr_ptr
+	if (0 == hpf.wr_ptr)
+		hpf.wr_ptr = 0;
 
 	for (axis = X; axis < AXES; ++axis) {
 		if (axis == FREQ_AXIS || axis == AMP_AXIS)
-			g_buffer_hipass.data[axis][g_buffer_hipass.wr_ptr] = ALPHA
-					* (g_buffer_in.data[axis][g_buffer_hipass.wr_ptr - 1]
-							+ g_buffer_in.data[axis][g_buffer_in.wr_ptr - 1]
-							- g_buffer_in.data[axis][g_buffer_in.wr_ptr - 2]);
+			hpf.data[axis][hpf.wr_ptr] = ALPHA
+					* (input.data[axis][hpf.wr_ptr - 1]
+							+ input.data[axis][input.wr_ptr - 1]
+							- input.data[axis][input.wr_ptr - 2]);
 	}
 
 	// Loop the write pointer if it has reached the end of the buffer
-	if (BUFFER_SIZE == ++g_buffer_hipass.wr_ptr)
-		g_buffer_hipass.wr_ptr = 0;
+	if (BUFFER_SIZE == ++hpf.wr_ptr)
+		hpf.wr_ptr = 0;
 }
 
 // Return RC high-pass filter output samples, given input samples,

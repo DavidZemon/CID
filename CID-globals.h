@@ -117,7 +117,18 @@ struct buffer_out {
 		uint16 rd_ptr;
 };
 
+// Filter & Integrator buffer (2D)
+struct buffer_filter {
+		IN_BUFF_TYPE **data;
+		uint8 size;
+		uint8 wr_ptr;
+};
+
 extern struct buffer_in g_buffer_in;
-extern struct buffer_in g_buffer_hipass;
+extern struct buffer_filter g_buffer_hpf1;
+extern struct buffer_filter g_buffer_hpf2;
+extern struct buffer_filter g_buffer_hpf3;
+//extern struct buffer_filter g_buffer_intgrt1;
+//extern struct buffer_filter g_buffer_intgrt2;
 extern struct buffer_out g_buffer_out;
 #endif /* CID_GLOBALS_H_ */
