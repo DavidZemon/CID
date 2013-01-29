@@ -56,13 +56,10 @@ void adc_isr (void) {
 		g_buffer_in.wr_ptr = 0;
 
 	++g_buffer_in.size;
-
-	highPass();
 }
 
-void dataProcessor (const uint16 newPts, struct buffer_in *input,
-		const uint16 in_width, const uint16 in_len,
-		struct buffer_out *output, const uint16 out_len) {
+void dataProcessor (const uint16 newPts, struct buffer_in *input, const uint16 in_width,
+		const uint16 in_len, struct buffer_out *output, const uint16 out_len) {
 	/* Description: Perform signal processing on the input buffer to generate an output buffer
 	 * 				TODO: What kind of signal processing?
 	 *
@@ -103,7 +100,7 @@ void dataProcessor (const uint16 newPts, struct buffer_in *input,
 	}
 
 	// TODO: Double integral of acceleration to find position
-	dspRead();
+//	dspRead();
 
 	// Create output value
 	output->data[output->wr_ptr] = waveGenerator(freq, amp, MAX_OUTPUT, &phase);
@@ -189,23 +186,20 @@ void sysInit (void) {
 	g_buffer_in.data = (IN_BUFF_TYPE **) malloc(AXES * sizeof(IN_BUFF_TYPE *));
 
 	for (axis = X; axis < AXES; ++axis) {
-		g_buffer_in.data[axis] = (uint32 *) malloc(
-				BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
+		g_buffer_in.data[axis] = (uint32 *) malloc(BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
 		for (i = 0; i < BUFFER_SIZE; ++i)
 			g_buffer_in.data[axis][i] = EMPTY;
 	}
 
 	// Initialize the high pass filter buffer
-	g_buffer_hipass.size = 1;
-	g_buffer_hipass.wr_ptr = 1;
-	g_buffer_hipass.rd_ptr = 0;
-	g_buffer_hipass.data = (IN_BUFF_TYPE **) malloc(AXES * sizeof(IN_BUFF_TYPE *));
+	g_buffer_hpf1.size = 1;
+	g_buffer_hpf1.wr_ptr = 1;
+	g_buffer_hpf1.data = (IN_BUFF_TYPE **) malloc(AXES * sizeof(IN_BUFF_TYPE *));
 	for (axis = X; axis < AXES; ++axis) {
-		g_buffer_hipass.data[axis] = (uint32 *) malloc(
-				BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
+		g_buffer_hpf1.data[axis] = (uint32 *) malloc(BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
 		for (i = 0; i < BUFFER_SIZE; ++i)
-			g_buffer_hipass.data[axis][i] = EMPTY;
-		g_buffer_hipass.data[axis][0] = 0;
+			g_buffer_hpf1.data[axis][i] = EMPTY;
+		g_buffer_hpf1.data[axis][0] = 0;
 
 	}
 
@@ -348,12 +342,15 @@ void wrTmrInit (void) {
 	TimerEnable(TIMER1_BASE, TIMER_A);
 }
 
-void highPass (buffer_filter input, buffer_filter hpf) {
-	/* Filter accelerometer data for improved accuracy during integration
-	 * Calculates most recent high pass filter (HPF) output
-	 * based on previous HPF output sample and current and previous filter input samples
+void highPass (struct buffer_filter input, struct buffer_filter hpf) {
+	/* @Description: Filter accelerometer data for improved accuracy during integration
+	 * 				Calculates most recent high pass filter (HPF) output based on previous
+	 * 				HPF output sample and current and previous filter input samples
 	 */
-	uint8 curr_smpl = hpf.wr_ptr
+
+	uint8 axis;
+	uint8 curr_smpl = hpf.wr_ptr;
+
 	if (0 == hpf.wr_ptr)
 		hpf.wr_ptr = 0;
 

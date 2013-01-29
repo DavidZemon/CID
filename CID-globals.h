@@ -36,8 +36,8 @@ typedef signed int int32;
 #define Z_PIN				GPIO_PIN_6
 
 // Buffer
-#define IN_BUFF_TYPE		uint32
-#define OUT_BUFF_TYPE		uint16
+typedef	uint32				IN_BUFF_TYPE;
+typedef uint16				OUT_BUFF_TYPE;
 #define BUFFER_SIZE 		5				// Sample buffer size
 #define EMPTY				-1				// -1 will represent an empty field
 #define AXES				3				// There are 3 axes between X, Y, and Z
@@ -103,32 +103,31 @@ typedef signed int int32;
  ************************/
 // Input buffer (2D)
 struct buffer_in {
-		IN_BUFF_TYPE **data;
-		uint16 size;
-		uint16 wr_ptr;
-		uint16 rd_ptr;
+	IN_BUFF_TYPE **data;
+	uint16 size;
+	uint16 wr_ptr;
+	uint16 rd_ptr;
 };
 
 // Output buffer (1D)
 struct buffer_out {
-		OUT_BUFF_TYPE *data;
-		uint16 size;
-		uint16 wr_ptr;
-		uint16 rd_ptr;
+	OUT_BUFF_TYPE *data;
+	uint16 size;
+	uint16 wr_ptr;
+	uint16 rd_ptr;
 };
 
 // Filter & Integrator buffer (2D)
 struct buffer_filter {
-		IN_BUFF_TYPE **data;
-		uint8 size;
-		uint8 wr_ptr;
+	IN_BUFF_TYPE **data;
+	uint8 size;
+	uint8 wr_ptr;
 };
 
 extern struct buffer_in g_buffer_in;
+extern struct buffer_out g_buffer_out;
 extern struct buffer_filter g_buffer_hpf1;
 extern struct buffer_filter g_buffer_hpf2;
 extern struct buffer_filter g_buffer_hpf3;
-//extern struct buffer_filter g_buffer_intgrt1;
-//extern struct buffer_filter g_buffer_intgrt2;
-extern struct buffer_out g_buffer_out;
+
 #endif /* CID_GLOBALS_H_ */
