@@ -9,12 +9,7 @@
 
 #include "CID-globals.h"
 
-IN_BUFF_TYPE **g_in_buffer;
-unsigned short g_in_bufSize = 0;
-unsigned short g_wr_in_idx = 0;
-unsigned short g_rd_in_idx = EMPTY;	// Initialize the read index to EMPTY
+struct buffer_in g_buffer_in;
+struct buffer_in g_buffer_hipass;
+struct buffer_out g_buffer_out;
 
-OUT_BUFF_TYPE g_out_buffer[BUFFER_SIZE];
-unsigned short g_out_bufSize = 0;
-unsigned short g_wr_out_idx = 0;
-unsigned short g_rd_out_idx = EMPTY;	// Initialize the read index to EMPTY

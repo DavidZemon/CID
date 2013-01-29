@@ -39,7 +39,7 @@ void adc_isr (void) {
 	// Check buffer size - if it's full, sound the alarm
 	// TODO: After ensuring this never happens, change it to a while loop to prevent
 	//		 killing the program on the off-chance that it does
-	if (BUFFER_SIZE == g_in_bufSize)
+	if (BUFFER_SIZE == g_buffer_in.size)
 		soundAlarm(BUFFER_FULL, EMPTY); // Holding function - execution will never return
 
 	// Retrieve data from ADC's FIFO
@@ -48,13 +48,14 @@ void adc_isr (void) {
 	// Place insert data into global buffer
 	unsigned short axis;
 	for (axis = X; axis < AXES; ++axis)
-		g_in_buffer[axis][g_wr_in_idx] = tempBuffer[axis];
+		g_buffer_in.data[axis][g_buffer_in.wr_ptr] = tempBuffer[axis];
 
 	// Loop the write pointer if it has reached the end of the buffer
-	if (BUFFER_SIZE == ++g_wr_in_idx)
-		g_wr_in_idx = 0;
+	if (BUFFER_SIZE == ++g_buffer_in.wr_ptr)
+		g_buffer_in.wr_ptr = 0;
 
-	++g_in_bufSize;
+	++g_buffer_in.size;
+	highPass();
 }
 
 void dataProcessor (const unsigned short newPts, IN_BUFF_TYPE **in_buffer,
@@ -133,22 +134,45 @@ void sysInit (void) {
 	/* Description: Initiate clock and call other init functions
 	 */
 
+	unsigned short axis, i;
+
 	// Enable system clock for 50 MHz
 	SysCtlClockSet(
 			SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
 
-	// Allocate and clear the input buffer
-	unsigned short axis, i;
-	g_in_buffer = (unsigned int **) malloc(AXES * sizeof(unsigned int *));
+	// Initialize the input buffer
+	g_buffer_in.size = 0;
+	g_buffer_in.wr_ptr = 0;
+	g_buffer_in.rd_ptr = 0;
+	g_buffer_in.data = (IN_BUFF_TYPE **) malloc(AXES * sizeof(IN_BUFF_TYPE *));
 	for (axis = X; axis < AXES; ++axis) {
-		g_in_buffer[axis] = (unsigned int *) malloc(BUFFER_SIZE * sizeof(unsigned int));
+		g_buffer_in.data[axis] = (unsigned int *) malloc(
+				BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
 		for (i = 0; i < BUFFER_SIZE; ++i)
-			g_in_buffer[axis][i] = EMPTY;
+			g_buffer_in.data[axis][i] = EMPTY;
 	}
 
-	// Clear the output buffer
+	// Initialize the high pass filter buffer
+	g_buffer_hipass.size = 1;
+	g_buffer_hipass.wr_ptr = 1;
+	g_buffer_hipass.rd_ptr = 0;
+	g_buffer_hipass.data = (IN_BUFF_TYPE **) malloc(AXES * sizeof(IN_BUFF_TYPE *));
+	for (axis = X; axis < AXES; ++axis) {
+		g_buffer_hipass.data[axis] = (unsigned int *) malloc(
+				BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
+		for (i = 0; i < BUFFER_SIZE; ++i)
+			g_buffer_hipass.data[axis][i] = EMPTY;
+		g_buffer_hipass.data[axis][0] = 0;
+	}
+
+	// Initialize the output buffer
+	g_buffer_out.size = 0;
+	g_buffer_out.wr_ptr = 0;
+	g_buffer_out.rd_ptr = 0;
+	g_buffer_out.data = (OUT_BUFF_TYPE *) malloc(BUFFER_SIZE * sizeof(OUT_BUFF_TYPE));
 	for (i = 0; i < BUFFER_SIZE; ++i)
-		g_out_buffer[i] = EMPTY;
+		g_buffer_out.data[i] = EMPTY;
+
 
 	// Initialize the timer, ADC, and SPI comm
 	rdTmrInit();
@@ -298,3 +322,23 @@ void dspRead (void) {
 
 
 }
+
+void highPass (void) {
+	unsigned float alpha;
+	alpha = FILTER_RC * RD_FREQ;
+	g_buffer_in.data[X][];
+	g_buffer_in.data[y][rd_ptr-1];
+}
+
+// Return RC high-pass filter output samples, given input samples,
+// time interval dt, and time constant RC
+//function highpass(real[0..n] x, real dt, real RC)
+//  var real[0..n] y
+//  var real a := RC / (RC + dt)
+//  y[0] := x[0]
+//  for i from 1 to n
+//    y[i] := a * y[i-1] + a * (x[i] - x[i-1])
+//  return y
+
+g_buffer_hipass.data[Y][g_buffer_hipass.wr_ptr] = ;
+g_buffer_hipass.data[Z][g_buffer_hipass.wr_ptr] = ;

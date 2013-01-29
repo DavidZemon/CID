@@ -44,6 +44,9 @@
 #define FREQ_POS_BASE		261.63
 #define AMP_POS_BASE		10
 
+// RC High Pass Filter
+#define FILTER_RC			3.003			// R = 222k, C = 1.5uF, fc = 1/RC
+
 // Alarm
 #define ALARM_SYSCTL		SYSCTL_PERIPH_GPIOG
 #define ALARM_PORT_BASE		GPIO_PORTG_BASE
@@ -88,16 +91,23 @@
 /************************
  *** Global Variables ***
  ************************/
-extern IN_BUFF_TYPE **g_in_buffer;
-extern unsigned short g_in_bufSize;
-extern unsigned short g_wr_in_idx;
-extern unsigned short g_rd_in_idx;				// Read index initialized to EMPTY
+// Input buffer (2D)
+struct buffer_in {
+		IN_BUFF_TYPE **data;
+		unsigned short size;
+		unsigned short wr_ptr;
+		unsigned short rd_ptr;
+};
 
-extern OUT_BUFF_TYPE g_out_buffer[BUFFER_SIZE];
-extern unsigned short g_out_bufSize;
-extern unsigned short g_wr_out_idx;
-extern unsigned short g_rd_out_idx;				// Read index initialized to EMPTY
+// Output buffer (1D)
+struct buffer_out {
+		OUT_BUFF_TYPE *data;
+		unsigned short size;
+		unsigned short wr_ptr;
+		unsigned short rd_ptr;
+};
 
-extern
-
+extern struct buffer_in g_buffer_in;
+extern struct buffer_in g_buffer_hipass;
+extern struct buffer_out g_buffer_out;
 #endif /* CID_GLOBALS_H_ */
