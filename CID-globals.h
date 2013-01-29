@@ -37,6 +37,16 @@
 #define Y					1
 #define Z					2
 
+// DSP calculation
+#define BEAT_AXIS			X
+#define FREQ_AXIS			Y
+#define AMP_AXIS			Z
+#define FREQ_POS_BASE		261.63
+#define AMP_POS_BASE		10
+
+// RC High Pass Filter
+#define FILTER_RC			3.003			// R = 222k, C = 1.5uF, fc = 1/RC
+
 // Alarm
 #define ALARM_SYSCTL		SYSCTL_PERIPH_GPIOG
 #define ALARM_PORT_BASE		GPIO_PORTG_BASE
@@ -99,6 +109,6 @@ struct buffer_out {
 };
 
 extern struct buffer_in g_buffer_in;
+extern struct buffer_in g_buffer_hipass;
 extern struct buffer_out g_buffer_out;
-
 #endif /* CID_GLOBALS_H_ */

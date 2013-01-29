@@ -56,6 +56,8 @@ void adc_isr (void) {
 		g_buffer_in.wr_ptr = 0;
 
 	++g_buffer_in.size;
+
+	highPass();
 }
 
 void dataProcessor (const unsigned short newPts, struct buffer_in *input,
@@ -100,7 +102,8 @@ void dataProcessor (const unsigned short newPts, struct buffer_in *input,
 		// TODO: What if (in_row + i >= BUFFER_SIZE)
 	}
 
-	// TODO: Do stuff
+	// TODO: Double integral of acceleration to find position
+	dspRead();
 
 	// Create output value
 	output->data[output->wr_ptr] = waveGenerator(freq, amp, MAX_OUTPUT, &phase);
@@ -184,11 +187,26 @@ void sysInit (void) {
 	g_buffer_in.wr_ptr = 0;
 	g_buffer_in.rd_ptr = 0;
 	g_buffer_in.data = (IN_BUFF_TYPE **) malloc(AXES * sizeof(IN_BUFF_TYPE *));
+
 	for (axis = X; axis < AXES; ++axis) {
 		g_buffer_in.data[axis] = (unsigned int *) malloc(
 				BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
 		for (i = 0; i < BUFFER_SIZE; ++i)
 			g_buffer_in.data[axis][i] = EMPTY;
+	}
+
+	// Initialize the high pass filter buffer
+	g_buffer_hipass.size = 1;
+	g_buffer_hipass.wr_ptr = 1;
+	g_buffer_hipass.rd_ptr = 0;
+	g_buffer_hipass.data = (IN_BUFF_TYPE **) malloc(AXES * sizeof(IN_BUFF_TYPE *));
+	for (axis = X; axis < AXES; ++axis) {
+		g_buffer_hipass.data[axis] = (unsigned int *) malloc(
+				BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
+		for (i = 0; i < BUFFER_SIZE; ++i)
+			g_buffer_hipass.data[axis][i] = EMPTY;
+		g_buffer_hipass.data[axis][0] = 0;
+
 	}
 
 	// Initialize the output buffer
@@ -198,6 +216,7 @@ void sysInit (void) {
 	g_buffer_out.data = (OUT_BUFF_TYPE *) malloc(BUFFER_SIZE * sizeof(OUT_BUFF_TYPE));
 	for (i = 0; i < BUFFER_SIZE; ++i)
 		g_buffer_out.data[i] = EMPTY;
+
 
 	// Initialize the timer, ADC, and SPI comm
 	rdTmrInit();
@@ -329,3 +348,41 @@ void wrTmrInit (void) {
 	// Turn on the timer
 	TimerEnable(TIMER1_BASE, TIMER_A);
 }
+
+void dspRead (void) {
+	/* x axis: 		acceleration
+	 * 				above a certain threshold -> trigger / create a beat
+	 * y & z axis:	acceleration --double integral--> position from origin
+	 * 				modulate frequency and amplitude based on pos
+	 */
+	unsigned int beat_accel = g_in_buffer[BEAT_AXIS][g_rd_in_idx];
+	unsigned int freq_accel = g_in_buffer[FREQ_AXIS][g_rd_in_idx];
+	unsigned int amp_accel = g_in_buffer[AMP_AXIS][g_rd_in_idx++];
+
+	static unsigned int freq_velo = freq_velo + freq_accel;
+	static unsigned int amp_velo = amp_velo + amp_accel;
+
+
+
+
+}
+
+void highPass (void) {
+	unsigned float alpha;
+	alpha = FILTER_RC * RD_FREQ;
+	g_buffer_in.data[X][];
+	g_buffer_in.data[y][rd_ptr-1];
+}
+
+// Return RC high-pass filter output samples, given input samples,
+// time interval dt, and time constant RC
+//function highpass(real[0..n] x, real dt, real RC)
+//  var real[0..n] y
+//  var real a := RC / (RC + dt)
+//  y[0] := x[0]
+//  for i from 1 to n
+//    y[i] := a * y[i-1] + a * (x[i] - x[i-1])
+//  return y
+
+g_buffer_hipass.data[Y][g_buffer_hipass.wr_ptr] = ;
+g_buffer_hipass.data[Z][g_buffer_hipass.wr_ptr] = ;
