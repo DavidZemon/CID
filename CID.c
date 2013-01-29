@@ -47,7 +47,7 @@ void adc_isr (void) {
 	ADCSequenceDataGet(ADC0_BASE + ACCEL_ADC, SEQUENCE, (unsigned long *) tempBuffer);
 
 	// Place insert data into global buffer
-	unsigned short axis;
+	uint16 axis;
 	for (axis = X; axis < AXES; ++axis)
 		g_buffer_in.data[axis][g_buffer_in.wr_ptr] = tempBuffer[axis];
 
@@ -60,9 +60,9 @@ void adc_isr (void) {
 	highPass();
 }
 
-void dataProcessor (const unsigned short newPts, struct buffer_in *input,
-		const unsigned short in_width, const unsigned short in_len,
-		struct buffer_out *output, const unsigned short out_len) {
+void dataProcessor (const uint16 newPts, struct buffer_in *input,
+		const uint16 in_width, const uint16 in_len,
+		struct buffer_out *output, const uint16 out_len) {
 	/* Description: Perform signal processing on the input buffer to generate an output buffer
 	 * 				TODO: What kind of signal processing?
 	 *
@@ -85,13 +85,13 @@ void dataProcessor (const unsigned short newPts, struct buffer_in *input,
 	static IN_BUFF_TYPE max;
 
 	// Set test values temporarily
-	unsigned int freq = 400;
+	uint32 freq = 400;
 	float amp = 1;
 	static float phase = 0;
 
 	// For each new data point, find out if the min and max points should be extended
 	// Note: All columns have the same min and max values
-	unsigned short col, i;
+	uint16 col, i;
 	for (i = 0; i < newPts; ++i) {
 		for (col = 0; col < in_width; ++col) {
 			if (max < input->data[col][input->rd_ptr + i])
@@ -117,7 +117,7 @@ void dataProcessor (const unsigned short newPts, struct buffer_in *input,
 		input->rd_ptr = 0;
 }
 
-OUT_BUFF_TYPE waveGenerator (const unsigned int freq, const float amp,
+OUT_BUFF_TYPE waveGenerator (const uint32 freq, const float amp,
 		const OUT_BUFF_TYPE peakAmp, float *phase) {
 	/* Description: Generate and return a single value of a wave (t = 0) for a wave with frequency 'freq',
 	 * 				amplitude 'amp', and phase 'phase'.
@@ -145,9 +145,9 @@ OUT_BUFF_TYPE waveGenerator (const unsigned int freq, const float amp,
 	return amp * peakAmp * cosf(*phase);
 }
 
-void soundAlarm (const unsigned char alarm, const int arg) {
-	unsigned short i;
-	unsigned short moddedAlarm = alarm;
+void soundAlarm (const uint8 alarm, const int32 arg) {
+	uint16 i;
+	uint16 moddedAlarm = alarm;
 	unsigned long moddedArg = arg;
 	unsigned long output;
 
@@ -176,7 +176,7 @@ void sysInit (void) {
 	/* Description: Initiate clock and call other init functions
 	 */
 
-	unsigned short axis, i;
+	uint16 axis, i;
 
 	// Enable system clock for 50 MHz
 	SysCtlClockSet(
@@ -189,7 +189,7 @@ void sysInit (void) {
 	g_buffer_in.data = (IN_BUFF_TYPE **) malloc(AXES * sizeof(IN_BUFF_TYPE *));
 
 	for (axis = X; axis < AXES; ++axis) {
-		g_buffer_in.data[axis] = (unsigned int *) malloc(
+		g_buffer_in.data[axis] = (uint32 *) malloc(
 				BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
 		for (i = 0; i < BUFFER_SIZE; ++i)
 			g_buffer_in.data[axis][i] = EMPTY;
@@ -201,7 +201,7 @@ void sysInit (void) {
 	g_buffer_hipass.rd_ptr = 0;
 	g_buffer_hipass.data = (IN_BUFF_TYPE **) malloc(AXES * sizeof(IN_BUFF_TYPE *));
 	for (axis = X; axis < AXES; ++axis) {
-		g_buffer_hipass.data[axis] = (unsigned int *) malloc(
+		g_buffer_hipass.data[axis] = (uint32 *) malloc(
 				BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
 		for (i = 0; i < BUFFER_SIZE; ++i)
 			g_buffer_hipass.data[axis][i] = EMPTY;
@@ -217,7 +217,6 @@ void sysInit (void) {
 	for (i = 0; i < BUFFER_SIZE; ++i)
 		g_buffer_out.data[i] = EMPTY;
 
-
 	// Initialize the timer, ADC, and SPI comm
 	rdTmrInit();
 	adcInit();
@@ -231,7 +230,7 @@ void rdTmrInit (void) {
 	 */
 
 	// Calculate the timer delay
-	unsigned int delay = SysCtlClockGet() / RD_FREQ;
+	uint32 delay = SysCtlClockGet() / RD_FREQ;
 
 	// Enable the clock for the timer
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
@@ -322,7 +321,7 @@ void alarmInit (void) {
 
 void wrTmrInit (void) {
 	// Calculate delay between writeing to the DAC
-	unsigned int delay = SysCtlClockGet() / WR_FREQ;
+	uint32 delay = SysCtlClockGet() / WR_FREQ;
 
 	// Enable clock to timer1
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
@@ -355,23 +354,34 @@ void dspRead (void) {
 	 * y & z axis:	acceleration --double integral--> position from origin
 	 * 				modulate frequency and amplitude based on pos
 	 */
-	unsigned int beat_accel = g_in_buffer[BEAT_AXIS][g_rd_in_idx];
-	unsigned int freq_accel = g_in_buffer[FREQ_AXIS][g_rd_in_idx];
-	unsigned int amp_accel = g_in_buffer[AMP_AXIS][g_rd_in_idx++];
+	uint32 beat_accel = g_in_buffer[BEAT_AXIS][g_rd_in_idx];
+	uint32 freq_accel = g_in_buffer[FREQ_AXIS][g_rd_in_idx];
+	uint32 amp_accel = g_in_buffer[AMP_AXIS][g_rd_in_idx++];
 
-	static unsigned int freq_velo = freq_velo + freq_accel;
-	static unsigned int amp_velo = amp_velo + amp_accel;
-
-
-
+	static uint32 freq_velo = freq_velo + freq_accel;
+	static uint32 amp_velo = amp_velo + amp_accel;
 
 }
 
-void highPass (void) {
-	unsigned float alpha;
-	alpha = FILTER_RC * RD_FREQ;
-	g_buffer_in.data[X][];
-	g_buffer_in.data[y][rd_ptr-1];
+void highPass (buffer_in input) {
+	/* Filter accelerometer data for improved accuracy during integration
+	 * Calculates most recent high pass filter (HPF) output
+	 * based on previous HPF output sample and current and previous filter input samples
+	 */
+	if (0 == g_buffer_hipass.wr_ptr)
+		g_buffer_hipass.wr_ptr = 0;
+
+	for (axis = X; axis < AXES; ++axis) {
+		if (axis == FREQ_AXIS || axis == AMP_AXIS)
+			g_buffer_hipass.data[axis][g_buffer_hipass.wr_ptr] = ALPHA
+					* (g_buffer_in.data[axis][g_buffer_hipass.wr_ptr - 1]
+							+ g_buffer_in.data[axis][g_buffer_in.wr_ptr - 1]
+							- g_buffer_in.data[axis][g_buffer_in.wr_ptr - 2]);
+	}
+
+	// Loop the write pointer if it has reached the end of the buffer
+	if (BUFFER_SIZE == ++g_buffer_hipass.wr_ptr)
+		g_buffer_hipass.wr_ptr = 0;
 }
 
 // Return RC high-pass filter output samples, given input samples,
@@ -383,6 +393,3 @@ void highPass (void) {
 //  for i from 1 to n
 //    y[i] := a * y[i-1] + a * (x[i] - x[i-1])
 //  return y
-
-g_buffer_hipass.data[Y][g_buffer_hipass.wr_ptr] = ;
-g_buffer_hipass.data[Z][g_buffer_hipass.wr_ptr] = ;

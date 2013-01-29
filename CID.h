@@ -42,14 +42,14 @@ void adc_isr (void);
 /*************************
  *** General functions ***
  *************************/
-void dataProcessor (const unsigned short newPts, struct buffer_in *input,
-		const unsigned short in_width, const unsigned short in_len,
-		struct buffer_out *output, const unsigned short out_len);
-OUT_BUFF_TYPE waveGenerator (const unsigned int freq, const float amp,
+void dataProcessor (const uint16 newPts, struct buffer_in *input,
+		const uint16 in_width, const uint16 in_len,
+		struct buffer_out *output, const uint16 out_len);
+OUT_BUFF_TYPE waveGenerator (const uint32 freq, const float amp,
 		const OUT_BUFF_TYPE peakAmp, float *phase);
-void soundAlarm (const unsigned char alarm, const int arg);
+void soundAlarm (const uint8 alarm, const int32 arg);
 #ifdef DEBUG
-void __error__(char *pcFilename, unsigned long ulLine) {}
+void __error__(int8 *pcFilename, unsigned long ulLine) {}
 #endif
 
 /********************************

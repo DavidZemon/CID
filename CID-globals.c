@@ -12,4 +12,3 @@
 struct buffer_in g_buffer_in;
 struct buffer_in g_buffer_hipass;
 struct buffer_out g_buffer_out;
-

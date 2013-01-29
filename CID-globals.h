@@ -10,6 +10,14 @@
 /***************
  *** Defines ***
  ***************/
+// Typedefs
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef signed char int8;
+typedef signed short int16;
+typedef signed int int32;
+
 // ADC/Timer hardware
 #define RD_FREQ				50000			// Timer triggers at 50 kHz
 #define ACCEL_ADC			0				// ADC in use for accelerometer
@@ -28,8 +36,8 @@
 #define Z_PIN				GPIO_PIN_6
 
 // Buffer
-#define IN_BUFF_TYPE		unsigned int
-#define OUT_BUFF_TYPE		unsigned short
+#define IN_BUFF_TYPE		uint32
+#define OUT_BUFF_TYPE		uint16
 #define BUFFER_SIZE 		5				// Sample buffer size
 #define EMPTY				-1				// -1 will represent an empty field
 #define AXES				3				// There are 3 axes between X, Y, and Z
@@ -46,6 +54,7 @@
 
 // RC High Pass Filter
 #define FILTER_RC			3.003			// R = 222k, C = 1.5uF, fc = 1/RC
+#define	ALPHA				FILTER_RC / (FILTER_RC + RD_FREQ)
 
 // Alarm
 #define ALARM_SYSCTL		SYSCTL_PERIPH_GPIOG
@@ -95,17 +104,17 @@
 // Input buffer (2D)
 struct buffer_in {
 		IN_BUFF_TYPE **data;
-		unsigned short size;
-		unsigned short wr_ptr;
-		unsigned short rd_ptr;
+		uint16 size;
+		uint16 wr_ptr;
+		uint16 rd_ptr;
 };
 
 // Output buffer (1D)
 struct buffer_out {
 		OUT_BUFF_TYPE *data;
-		unsigned short size;
-		unsigned short wr_ptr;
-		unsigned short rd_ptr;
+		uint16 size;
+		uint16 wr_ptr;
+		uint16 rd_ptr;
 };
 
 extern struct buffer_in g_buffer_in;
