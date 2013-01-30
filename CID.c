@@ -348,18 +348,29 @@ void highPass (struct buffer_filter input, struct buffer_filter hpf) {
 	 * 				HPF output sample and current and previous filter input samples
 	 */
 
-	uint8 axis;
-	uint8 curr_smpl = hpf.wr_ptr;
+	uint8 axis, nxt_idx, curr_idx, prev_idx;
+	nxt_idx = input.wr_ptr;
 
-	if (0 == hpf.wr_ptr)
-		hpf.wr_ptr = 0;
+	// Prepare correct previous sample indexes in circular buffer
+	if (0 == nxt_idx) {
+		curr_idx = BUFFSIZE - 1;
+		prev_idx = BUFFSIZE - 2;
+	}
+	else if (1 == nxt_idx) {
+		curr_idx = 0;
+		prev_idx = BUFFSIZE - 1;
+	}
+	else{
+		curr_idx = nxt_idx - 1;
+		prev_idx = nxt_idx - 2;
+	}
+
 
 	for (axis = X; axis < AXES; ++axis) {
 		if (axis == FREQ_AXIS || axis == AMP_AXIS)
 			hpf.data[axis][hpf.wr_ptr] = ALPHA
-					* (input.data[axis][hpf.wr_ptr - 1]
-							+ input.data[axis][input.wr_ptr - 1]
-							- input.data[axis][input.wr_ptr - 2]);
+					* (hpf.data[axis][curr_idx]
+							+ input.data[axis][curr_idx] - input.data[axis][prev_idx]);
 	}
 
 	// Loop the write pointer if it has reached the end of the buffer
