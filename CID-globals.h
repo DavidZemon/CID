@@ -17,9 +17,11 @@ typedef unsigned int uint32;
 typedef signed char int8;
 typedef signed short int16;
 typedef signed int int32;
+typedef uint32 IN_TYPE;
+typedef uint16 OUT_TYPE;
 
 // ADC/Timer hardware
-#define RD_FREQ				50000			// Timer triggers at 50 kHz
+#define RD_FREQ				5000			// Timer triggers at 5 kHz
 #define ACCEL_ADC			0				// ADC in use for accelerometer
 #define SEQUENCE			1				// ADC Sequencer
 #define HARDWARE_AVERAGER	4				// Average 4 samples (choose from 2^1 through 2^4)
@@ -36,8 +38,6 @@ typedef signed int int32;
 #define Z_PIN				GPIO_PIN_6
 
 // Buffer
-typedef	uint32				IN_BUFF_TYPE;
-typedef uint16				OUT_BUFF_TYPE;
 #define BUFFER_SIZE 		5				// Sample buffer size
 #define EMPTY				-1				// -1 will represent an empty field
 #define AXES				3				// There are 3 axes between X, Y, and Z
@@ -51,6 +51,10 @@ typedef uint16				OUT_BUFF_TYPE;
 #define AMP_AXIS			Z
 #define FREQ_POS_BASE		261.63
 #define AMP_POS_BASE		10
+
+// Beat info
+#define MAX_BEAT_IDX		18000
+#define BEAT_FREQ
 
 // RC High Pass Filter
 #define FILTER_RC			3.003			// R = 222k, C = 1.5uF, fc = 1/RC
@@ -101,33 +105,25 @@ typedef uint16				OUT_BUFF_TYPE;
 /************************
  *** Global Variables ***
  ************************/
-// Input buffer (2D)
-struct buffer_in {
-	IN_BUFF_TYPE **data;
+// Circular buffer
+struct buffer {
+	IN_TYPE **data;
 	uint16 size;
 	uint16 wr_ptr;
 	uint16 rd_ptr;
 };
 
-// Output buffer (1D)
-struct buffer_out {
-	OUT_BUFF_TYPE *data;
-	uint16 size;
-	uint16 wr_ptr;
-	uint16 rd_ptr;
+// Struct to contain information for a single wave
+struct wave {
+	uint16 freq;
+	float amp;
 };
 
-// Filter & Integrator buffer (2D)
-struct buffer_filter {
-	IN_BUFF_TYPE **data;
-	uint8 size;
-	uint8 wr_ptr;
-};
-
-extern struct buffer_in g_buffer_in;
-extern struct buffer_out g_buffer_out;
-extern struct buffer_filter g_buffer_hpf1;
-extern struct buffer_filter g_buffer_hpf2;
-extern struct buffer_filter g_buffer_hpf3;
+extern struct buffer g_buffer_in;
+extern struct wave g_wave;
+extern struct wave g_beatWave;
+extern uint8 g_flag_posReset;
+extern uint8 g_flag_throwBeat;
+extern uint8 g_flag_POR;
 
 #endif /* CID_GLOBALS_H_ */
