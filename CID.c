@@ -58,6 +58,18 @@ void adc_isr (void) {
 	++g_buffer_in.size;
 }
 
+void pos_reset_isr (void) {
+	/* @Description: Resets position dependent axes to zero upon user button press
+	 *				Uses the corner user switch, SW5, GPIO pin PM4
+	 *				Use filter initialization function with zero parameter to fill buffers w/ 0
+	 */
+
+	//TODO: tie to flag thrown by button press, and tie a flag to the button press
+	filterInit(g_buffer_hpf1, 0);
+	filterInit(g_buffer_hpf2, 0);
+	filterInit(g_buffer_hpf3, 0);
+}
+
 void dataProcessor (const uint16 newPts, struct buffer_in *input, const uint16 in_width,
 		const uint16 in_len, struct buffer_out *output, const uint16 out_len) {
 	/* Description: Perform signal processing on the input buffer to generate an output buffer
@@ -169,6 +181,44 @@ void soundAlarm (const uint8 alarm, const int32 arg) {
 	}
 }
 
+void highPass (struct buffer_filter input, struct buffer_filter hpf) {
+	/* @Description: Filter accelerometer data for improved accuracy during integration
+	 * 				Calculates most recent high pass filter (HPF) output based on previous
+	 * 				HPF output sample and current and previous filter input samples
+	 *
+	 * 				Accel -> ADC -> HPF -> Integrator -> HPF -> Integrator -> HPF -> Position
+	 */
+
+	uint8 axis, nxt_idx, curr_idx, prev_idx;
+	nxt_idx = input.wr_ptr;
+
+	// Prepare correct previous sample indexes in circular buffer
+	if (0 == nxt_idx) {
+		curr_idx = BUFFSIZE - 1;
+		prev_idx = BUFFSIZE - 2;
+	} else if (1 == nxt_idx) {
+		curr_idx = 0;
+		prev_idx = BUFFSIZE - 1;
+	} else {
+		curr_idx = nxt_idx - 1;
+		prev_idx = nxt_idx - 2;
+	}
+
+	// Perform HPF calculation for current samples on both position-dependent axes
+	for (axis = X; axis < AXES; ++axis) {
+		if (axis == FREQ_AXIS || axis == AMP_AXIS)
+			hpf.data[axis][hpf.wr_ptr] = ALPHA
+					* (hpf.data[axis][curr_idx] + input.data[axis][curr_idx]
+							- input.data[axis][prev_idx]);
+	}
+
+	// Loop the write pointer if it has reached the end of the buffer
+	if (BUFFER_SIZE == ++hpf.wr_ptr)
+		hpf.wr_ptr = 0;
+
+	// Integration is next: subtract current sample from previous sample
+}
+
 void sysInit (void) {
 	/* Description: Initiate clock and call other init functions
 	 */
@@ -191,17 +241,10 @@ void sysInit (void) {
 			g_buffer_in.data[axis][i] = EMPTY;
 	}
 
-	// Initialize the high pass filter buffer
-	g_buffer_hpf1.size = 1;
-	g_buffer_hpf1.wr_ptr = 1;
-	g_buffer_hpf1.data = (IN_BUFF_TYPE **) malloc(AXES * sizeof(IN_BUFF_TYPE *));
-	for (axis = X; axis < AXES; ++axis) {
-		g_buffer_hpf1.data[axis] = (uint32 *) malloc(BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
-		for (i = 0; i < BUFFER_SIZE; ++i)
-			g_buffer_hpf1.data[axis][i] = EMPTY;
-		g_buffer_hpf1.data[axis][0] = 0;
-
-	}
+	// Initialize the high pass filter buffers (3)
+	filterInit(g_buffer_hpf1, 1);
+	filterInit(g_buffer_hpf2, 1);
+	filterInit(g_buffer_hpf3, 1);
 
 	// Initialize the output buffer
 	g_buffer_out.size = 0;
@@ -342,48 +385,26 @@ void wrTmrInit (void) {
 	TimerEnable(TIMER1_BASE, TIMER_A);
 }
 
-void highPass (struct buffer_filter input, struct buffer_filter hpf) {
-	/* @Description: Filter accelerometer data for improved accuracy during integration
-	 * 				Calculates most recent high pass filter (HPF) output based on previous
-	 * 				HPF output sample and current and previous filter input samples
+void filterInit (struct buffer_filter filter, uint8 zero) {
+	/* @Description: Initializes the buffers used with the high pass filters (HPFs)
+	 * 				Sets all values to EMPTY and places an initial condition/value of zero
+	 * 				zero parameter chooses whether to fill with EMPTY or zero
+	 * 					zero if = 0, EMPTY if != 0
 	 */
 
-	uint8 axis, nxt_idx, curr_idx, prev_idx;
-	nxt_idx = input.wr_ptr;
+	if (0 == zero)
+		int8 fill = 0;
+	else
+		int8 fill = EMPTY;
 
-	// Prepare correct previous sample indexes in circular buffer
-	if (0 == nxt_idx) {
-		curr_idx = BUFFSIZE - 1;
-		prev_idx = BUFFSIZE - 2;
-	}
-	else if (1 == nxt_idx) {
-		curr_idx = 0;
-		prev_idx = BUFFSIZE - 1;
-	}
-	else{
-		curr_idx = nxt_idx - 1;
-		prev_idx = nxt_idx - 2;
-	}
-
-
+	filter.size = 1;
+	filter.wr_ptr = 1;
+	filter.data = (IN_BUFF_TYPE **) malloc(AXES * sizeof(IN_BUFF_TYPE *));
 	for (axis = X; axis < AXES; ++axis) {
-		if (axis == FREQ_AXIS || axis == AMP_AXIS)
-			hpf.data[axis][hpf.wr_ptr] = ALPHA
-					* (hpf.data[axis][curr_idx]
-							+ input.data[axis][curr_idx] - input.data[axis][prev_idx]);
+		filter.data[axis] = (uint32 *) malloc(BUFFER_SIZE * sizeof(IN_BUFF_TYPE));
+		for (i = 0; i < BUFFER_SIZE; ++i)
+			filter.data[axis][i] = fill;
+		filter.data[axis][0] = 0;
 	}
-
-	// Loop the write pointer if it has reached the end of the buffer
-	if (BUFFER_SIZE == ++hpf.wr_ptr)
-		hpf.wr_ptr = 0;
 }
 
-// Return RC high-pass filter output samples, given input samples,
-// time interval dt, and time constant RC
-//function highpass(real[0..n] x, real dt, real RC)
-//  var real[0..n] y
-//  var real a := RC / (RC + dt)
-//  y[0] := x[0]
-//  for i from 1 to n
-//    y[i] := a * y[i-1] + a * (x[i] - x[i-1])
-//  return y
