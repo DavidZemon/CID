@@ -10,7 +10,7 @@ void main (void) {
 
 	// Test code to see if wave generator and ISRs work
 	g_wave.amp = 1;
-	g_wave.freq = 440;
+	g_wave.freq = 1000;
 	while(1);
 
 	while (1)
@@ -26,18 +26,24 @@ void sysInit (void) {
 	SysCtlClockSet(
 			SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
 
-	// Initialize the input buffer
-	bufferInit(&g_buffer_in, AXES, BUFFER_SIZE, EMPTY);
+	IntMasterDisable();
+
+	// TODO TODO TODO TODO: Debug this shit. It broked.
 
 	g_flag_posReset = 1; // Set flag to initialize high pass filters
 	g_flag_POR = 1;	// Set flag for power-on-reset
 
 	// Initialize the timer, ADC, and SPI comm
 	rdTmrInit();
-	adcInit();
+//	adcInit();
 	spiInit();
+	alarmInit();
+	wrTmrInit();
 
 	IntMasterEnable();
+
+	// Initialize the input buffer
+	//bufferInit(&g_buffer_in, AXES, BUFFER_SIZE, EMPTY);
 }
 
 void rdTmrInit (void) {
@@ -105,16 +111,16 @@ void adcInit (void) {
 void spiInit (void) {
 	// Enable clock to SSI module & GPIO port
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_SSI0 + DAC_SSI);
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA + DAC_GPIO_PORT - 'A'); // Char add/subtract allows for easy port switching
-
-	// Set pins for use by SSI module
-	GPIOPinTypeSSI(GPIO_PORTA_BASE + DAC_GPIO_PORT - 'A',
-			DAC_CLK_PIN | DAC_FSS_PIN | DAC_TX_PIN);
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA + 1 << (DAC_GPIO_PORT - 'A')); // Char add/subtract allows for easy port switching
 
 	// Set pin MUXes within the SSI module
 	GPIOPinConfigure(DAC_CLK_PIN_CFG);
 	GPIOPinConfigure(DAC_FSS_PIN_CFG);
 	GPIOPinConfigure(DAC_TX_PIN_CFG);
+
+	// Set pins for use by SSI module
+	GPIOPinTypeSSI(GPIO_PORTA_BASE + 1 << (DAC_GPIO_PORT - 'A'),
+			DAC_CLK_PIN | DAC_FSS_PIN | DAC_TX_PIN);
 
 	// Configure tons o' settings for SPI/SSI
 	SSIConfigSetExpClk(DAC_SSI_BASE, SysCtlClockGet(), SSI_FRF_MOTO_MODE_0,
@@ -396,13 +402,13 @@ void write_out_isr (void) {
 	OUT_TYPE output;
 
 	output = waveGenerator(g_wave, MAX_OUTPUT, &mainPhase);
-	if (EMPTY != beatIdx || g_flag_throwBeat) {
+	/*if (EMPTY != beatIdx || g_flag_throwBeat) {
 		output += waveGenerator(g_beatWave, MAX_OUTPUT, &beatPhase);
 		if (MAX_BEAT_IDX == beatIdx) {
 			beatIdx = EMPTY;
 			g_flag_throwBeat = 0;
 		}
-	}
+	}*/
 
 	SSIDataPutNonBlocking(DAC_SSI_BASE, output << 2);
 }

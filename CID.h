@@ -68,5 +68,7 @@ void sysInit (void);
 void rdTmrInit (void);
 void adcInit (void);
 void spiInit (void);
+void alarmInit (void);
+void wrTmrInit (void);
 
 #endif /* CID_H_ */
