@@ -49,9 +49,13 @@ OUT_TYPE waveGenerator (const struct wave par, const OUT_TYPE peakAmp, float *ph
 
 void soundAlarm (const uint8 alarm, const int32 arg);
 
+void doubleIntegrator (struct buffer input, IN_TYPE *freqPos, IN_TYPE *volPos);
+
 void highPass (struct buffer *input, struct buffer *output);
 
-void bufferInit (struct buffer *buf);
+void updateIntegrator (struct buffer *input, struct buffer *output);
+
+void bufferInit (struct buffer *buf, uint8 width, uint16 length, IN_TYPE initVal);
 
 #ifdef DEBUG
 void __error__(int8 *pcFilename, unsigned long ulLine) {}

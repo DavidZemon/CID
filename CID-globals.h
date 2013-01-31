@@ -38,7 +38,7 @@ typedef uint16 OUT_TYPE;
 #define Z_PIN				GPIO_PIN_6
 
 // Buffer
-#define BUFFER_SIZE 		5				// Sample buffer size
+#define BUFFER_SIZE 		16				// Sample buffer size
 #define EMPTY				-1				// -1 will represent an empty field
 #define AXES				3				// There are 3 axes between X, Y, and Z
 #define X					0				// First step of the sequencer is the X-axis
@@ -107,16 +107,18 @@ typedef uint16 OUT_TYPE;
  ************************/
 // Circular buffer
 struct buffer {
-	IN_TYPE **data;
-	uint16 size;
-	uint16 wr_ptr;
-	uint16 rd_ptr;
+	IN_TYPE		**data;
+	uint16		size;		// Current size (length) of the buffer;
+	uint16		length;		// Maximum length of the buffer
+	uint8		width;		// Maximum width of the buffer
+	uint16		wr_ptr;
+	uint16		rd_ptr;
 };
 
 // Struct to contain information for a single wave
 struct wave {
-	uint16 freq;
-	float amp;
+	uint16		freq;
+	float		amp;
 };
 
 extern struct buffer g_buffer_in;

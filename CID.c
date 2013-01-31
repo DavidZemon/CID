@@ -8,6 +8,11 @@
 void main (void) {
 	sysInit();
 
+	// Test code to see if wave generator and ISRs work
+	g_wave.amp = 1;
+	g_wave.freq = 440;
+	while(1);
+
 	while (1)
 		if (g_buffer_in.size)
 			g_wave = dataProcessor(&g_buffer_in, AXES, BUFFER_SIZE);
@@ -17,28 +22,15 @@ void sysInit (void) {
 	/* Description: Initiate clock and call other init functions
 	 */
 
-	uint16 axis, i;
-
 	// Enable system clock for 50 MHz
 	SysCtlClockSet(
 			SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
 
 	// Initialize the input buffer
-	g_buffer_in.size = 0;
-	g_buffer_in.wr_ptr = 0;
-	g_buffer_in.rd_ptr = 0;
-	g_buffer_in.data = (IN_TYPE **) malloc(AXES * sizeof(IN_TYPE *));
+	bufferInit(&g_buffer_in, AXES, BUFFER_SIZE, EMPTY);
 
-	for (axis = X; axis < AXES; ++axis) {
-		g_buffer_in.data[axis] = (uint32 *) malloc(BUFFER_SIZE * sizeof(IN_TYPE));
-		for (i = 0; i < BUFFER_SIZE; ++i)
-			g_buffer_in.data[axis][i] = EMPTY;
-	}
-
-	// Set flag to initialize high pass filters
-	g_flag_posReset = 1;
-
-	g_flag_POR = 1;
+	g_flag_posReset = 1; // Set flag to initialize high pass filters
+	g_flag_POR = 1;	// Set flag for power-on-reset
 
 	// Initialize the timer, ADC, and SPI comm
 	rdTmrInit();
@@ -171,35 +163,25 @@ void wrTmrInit (void) {
 	TimerEnable(TIMER1_BASE, TIMER_A);
 }
 
-void bufferInit (struct buffer *buf) {
-	/* @Description: Initializes the buffers used with the high pass filters (HPFs)
-	 * 				Sets all values to EMPTY and places an initial condition/value of zero
-	 * 				zero parameter chooses whether to fill with EMPTY or zero
-	 * 					zero if = 0, EMPTY if != 0
+void bufferInit (struct buffer *buf, uint8 width, uint16 length, IN_TYPE initVal) {
+	/* Description:
+	 *
+	 * @param
 	 */
-	uint16 axis, i;
+	uint16 row;
+	uint8 col;
 
-	buf->size = 1;
-	buf->wr_ptr = 1;
-	buf->data = (IN_TYPE **) malloc(AXES * sizeof(IN_TYPE *));
-	for (axis = X; axis < AXES; ++axis) {
-		buf->data[axis] = (uint32 *) malloc(BUFFER_SIZE * sizeof(IN_TYPE));
-		for (i = 0; i < BUFFER_SIZE; ++i)
-			buf->data[axis][i] = 0;
-	}
+	buf->length = length;
+	buf->width = width;
+	buf->size = 0;
+	buf->wr_ptr = 0;
+	buf->rd_ptr = 0;
+	buf->data = (IN_TYPE **) malloc(buf->width * sizeof(IN_TYPE *));
 
-	// TODO TODO TODO TODO: Can we simplify the buffer init function into a single function? Problem with wr_ptr being 1 or 0
-
-	// Initialize the input buffer
-	g_buffer_in.size = 0;
-	g_buffer_in.wr_ptr = 0;
-	g_buffer_in.rd_ptr = 0;
-	g_buffer_in.data = (IN_TYPE **) malloc(AXES * sizeof(IN_TYPE *));
-
-	for (axis = X; axis < AXES; ++axis) {
-		g_buffer_in.data[axis] = (uint32 *) malloc(BUFFER_SIZE * sizeof(IN_TYPE));
-		for (i = 0; i < BUFFER_SIZE; ++i)
-			g_buffer_in.data[axis][i] = EMPTY;
+	for (col = X; col < buf->width; ++col) {
+		g_buffer_in.data[col] = (uint32 *) malloc(buf->length * sizeof(IN_TYPE));
+		for (row = 0; row < buf->length; ++row)
+			g_buffer_in.data[col][row] = initVal;
 	}
 }
 
@@ -226,25 +208,33 @@ struct wave dataProcessor (struct buffer *input, const uint16 in_width,
 	 * @return		None
 	 */
 
-	// TODO: Is newPts necessary or can we just output a single value for each call of dataProcessor()?
+	// Declare variables for high pass filter and integrator buffers
 	static IN_TYPE min;
 	static IN_TYPE max;
 	static struct buffer *hpf1;
 	static struct buffer *hpf2;
 	static struct buffer *hpf3;
+	static struct buffer *intBuf1;
+	static struct buffer *intBuf2;
 
+	// If the positional reset flag is set, clear the HPF and integrator buffers
 	if (g_flag_posReset) {
-		if (g_flag_POR) { // If Power On Reset...
+		if (g_flag_POR) { // Allocate memory if Power On Reset...
 			hpf1 = (struct buffer *) malloc(sizeof(struct buffer));
 			hpf2 = (struct buffer *) malloc(sizeof(struct buffer));
 			hpf3 = (struct buffer *) malloc(sizeof(struct buffer));
+			intBuf1 = (struct buffer *) malloc(sizeof(struct buffer));
+			intBuf2 = (struct buffer *) malloc(sizeof(struct buffer));
 			g_flag_POR = 0;
 		}
 
 		// Initialize the buffer
-		bufferInit(hpf1);
-		bufferInit(hpf2);
-		bufferInit(hpf3);
+		bufferInit(hpf1, AXES, BUFFER_SIZE, 0);
+		bufferInit(hpf2, AXES, BUFFER_SIZE, 0);
+		bufferInit(hpf3, AXES, BUFFER_SIZE, 0);
+		bufferInit(intBuf1, AXES, BUFFER_SIZE, 0);
+		bufferInit(intBuf2, AXES, BUFFER_SIZE, 0);
+
 		g_flag_posReset = 0;
 	}
 
@@ -263,6 +253,11 @@ struct wave dataProcessor (struct buffer *input, const uint16 in_width,
 
 	// TODO: Double integral of acceleration to find position
 	//dspRead();
+	highPass(input, hpf1);
+	updateIntegrator(hpf1, intBuf1);
+	highPass(intBuf1, hpf2);
+	updateIntegrator(hpf2, intBuf2);
+	highPass(intBuf2, hpf3);
 
 	// TODO: Find new amplitude and frequency
 
@@ -324,19 +319,6 @@ void soundAlarm (const uint8 alarm, const int32 arg) {
 	}
 }
 
-void doubleIntegrator (struct buffer input, IN_TYPE *freqPos, IN_TYPE *volPos) {
-	/* Description: Take input from the input buffer, integrate the values to get position, and
-	 * 				return the position of two axes
-	 *
-	 * @param	input		Input buffer from the ADC
-	 * @param	*freqPos	Position of the frequency axis will be output to this var
-	 * @param	*volPos		Position of the volume axis will be output to this var
-	 *
-	 * @return		void (freqPos and volPos serve as return parameters)
-	 */
-
-}
-
 void highPass (struct buffer *input, struct buffer *output) {
 	/* @Description: Filter accelerometer data for improved accuracy during integration
 	 * 				Calculates most recent high pass filter (HPF) output based on previous
@@ -361,18 +343,47 @@ void highPass (struct buffer *input, struct buffer *output) {
 	}
 
 	// Perform HPF calculation for current samples on both position-dependent axes
-	for (axis = X; axis < AXES; ++axis) {
+	for (axis = X; axis < AXES; ++axis)
 		if (axis == FREQ_AXIS || axis == AMP_AXIS)
 			output->data[axis][output->wr_ptr] = ALPHA
 					* (output->data[axis][curr_idx] + input->data[axis][curr_idx]
 							- input->data[axis][prev_idx]);
-	}
 
 	// Loop the write pointer if it has reached the end of the buffer
 	if (BUFFER_SIZE == ++output->wr_ptr)
 		output->wr_ptr = 0;
 
 	// Integration is next: subtract current sample from previous sample
+}
+
+void updateIntegrator (struct buffer *input, struct buffer *output) {
+	/* Description: performs discrete integration on the input buffer
+	 * 				discrete integration of Yn = Xn - Xn-1
+	 */
+
+	uint8 axis, nxt_idx, curr_idx, prev_idx;
+	nxt_idx = input->wr_ptr;
+
+	// Prepare correct previous sample indexes in circular buffer
+	if (0 == nxt_idx) {
+		curr_idx = BUFFER_SIZE - 1;
+		prev_idx = BUFFER_SIZE - 2;
+	} else if (1 == nxt_idx) {
+		curr_idx = 0;
+		prev_idx = BUFFER_SIZE - 1;
+	} else {
+		curr_idx = nxt_idx - 1;
+		prev_idx = nxt_idx - 2;
+	}
+
+	for (axis = X; axis < AXES; ++axis)
+		if (axis == FREQ_AXIS || axis == AMP_AXIS)
+			output->data[axis][output->wr_ptr] = input->data[axis][curr_idx]
+					- input->data[axis][prev_idx];
+
+	// Loop the write pointer if it has reached the end of the buffer
+	if (BUFFER_SIZE == ++output->wr_ptr)
+		output->wr_ptr = 0;
 }
 
 void write_out_isr (void) {
@@ -411,7 +422,7 @@ void adc_isr (void) {
 	// Retrieve data from ADC's FIFO
 	ADCSequenceDataGet(ADC0_BASE + ACCEL_ADC, SEQUENCE, (unsigned long *) tempBuffer);
 
-	// Place insert data into global buffer
+	// Place data into global buffer
 	uint16 axis;
 	for (axis = X; axis < AXES; ++axis)
 		g_buffer_in.data[axis][g_buffer_in.wr_ptr] = tempBuffer[axis];
