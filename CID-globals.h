@@ -65,20 +65,22 @@ typedef uint16 OUT_TYPE;
 #define ALARM_PORT_BASE		GPIO_PORTG_BASE
 #define ALARM_PIN			GPIO_PIN_2
 
-// SPI hardware
+// SPI hardware   --- TODO: Ask Z about DAC_SSI_BASE issue - why won't the fancy math work? SSI0_BASE + (unsigned long) (DAC_SSI << 12)
 #define DAC_SSI				1				// SSI module used for DAC
-#define DAC_SSI_BASE		SSI1_BASE		// Base address of SSI module
+#define DAC_SSI_BASE		SSI1_BASE		// SSI module's base address *** CHANGE THIS IN CONJUCTION WITH SSI MODULE ***
 #define SSI_BITRATE			1000000			// Set SSI's bit rate (1 MHz)
-#define SSI_BIT_WIDTH		16				// Bit-width of SSI comms
-#define DAC_GPIO_PORT		'D'				// SSI's GPIO port
-#if DAC_GPIO_PORT == 'D'
+#define SSI_BIT_WIDTH		12				// Bit-width of SSI comms
+#define SSI_GPIO_CLK		SYSCTL_PERIPH_GPIOD
+#define	SSI_CLK				SYSCTL_PERIPH_SSI1
+#define SSI_GPIO_BASE		GPIO_PORTD_BASE
+#if SSI_GPIO_BASE == GPIO_PORTD_BASE
 #define DAC_CLK_PIN			GPIO_PIN_0
 #define DAC_FSS_PIN			GPIO_PIN_1
 #define DAC_TX_PIN			GPIO_PIN_3
 #define DAC_CLK_PIN_CFG		GPIO_PCTL_PD0_SSI1CLK
 #define DAC_FSS_PIN_CFG		GPIO_PCTL_PD1_SSI1FSS
 #define DAC_TX_PIN_CFG		GPIO_PCTL_PD3_SSI1TX
-#elif DAC_GPIO_PORT == 'F'
+#elif SSI_GPIO_BASE == GPIO_PORTF_BASE
 #define DAC_CLK_PIN			GPIO_PIN_2
 #define DAC_FSS_PIN			GPIO_PIN_3
 #define DAC_TX_PIN			GPIO_PIN_1

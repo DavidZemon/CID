@@ -11,7 +11,8 @@ void main (void) {
 	// Test code to see if wave generator and ISRs work
 	g_wave.amp = 1;
 	g_wave.freq = 1000;
-	while(1);
+	while (1)
+		;
 
 	while (1)
 		if (g_buffer_in.size)
@@ -35,7 +36,7 @@ void sysInit (void) {
 
 	// Initialize the timer, ADC, and SPI comm
 	rdTmrInit();
-//	adcInit();
+	adcInit();
 	spiInit();
 	alarmInit();
 	wrTmrInit();
@@ -110,8 +111,8 @@ void adcInit (void) {
 
 void spiInit (void) {
 	// Enable clock to SSI module & GPIO port
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_SSI0 + DAC_SSI);
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA + 1 << (DAC_GPIO_PORT - 'A')); // Char add/subtract allows for easy port switching
+	SysCtlPeripheralEnable(SSI_CLK);		// Enable clock to SSI module
+	SysCtlPeripheralEnable(SSI_GPIO_CLK);	// Enable clock to GPIO port for SSI
 
 	// Set pin MUXes within the SSI module
 	GPIOPinConfigure(DAC_CLK_PIN_CFG);
@@ -119,12 +120,11 @@ void spiInit (void) {
 	GPIOPinConfigure(DAC_TX_PIN_CFG);
 
 	// Set pins for use by SSI module
-	GPIOPinTypeSSI(GPIO_PORTA_BASE + 1 << (DAC_GPIO_PORT - 'A'),
-			DAC_CLK_PIN | DAC_FSS_PIN | DAC_TX_PIN);
+	GPIOPinTypeSSI(SSI_GPIO_BASE, DAC_CLK_PIN | DAC_FSS_PIN | DAC_TX_PIN);
 
 	// Configure tons o' settings for SPI/SSI
-	SSIConfigSetExpClk(DAC_SSI_BASE, SysCtlClockGet(), SSI_FRF_MOTO_MODE_0,
-			SSI_MODE_MASTER, SSI_BITRATE, SSI_BIT_WIDTH);
+	SSIConfigSetExpClk(DAC_SSI_BASE, SysCtlClockGet(),
+			SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, SSI_BITRATE, SSI_BIT_WIDTH);
 
 	SSIEnable(DAC_SSI_BASE);
 }
@@ -403,12 +403,12 @@ void write_out_isr (void) {
 
 	output = waveGenerator(g_wave, MAX_OUTPUT, &mainPhase);
 	/*if (EMPTY != beatIdx || g_flag_throwBeat) {
-		output += waveGenerator(g_beatWave, MAX_OUTPUT, &beatPhase);
-		if (MAX_BEAT_IDX == beatIdx) {
-			beatIdx = EMPTY;
-			g_flag_throwBeat = 0;
-		}
-	}*/
+	 output += waveGenerator(g_beatWave, MAX_OUTPUT, &beatPhase);
+	 if (MAX_BEAT_IDX == beatIdx) {
+	 beatIdx = EMPTY;
+	 g_flag_throwBeat = 0;
+	 }
+	 }*/
 
 	SSIDataPutNonBlocking(DAC_SSI_BASE, output << 2);
 }
