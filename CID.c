@@ -5,12 +5,14 @@
 
 #include "CID.h"
 
+unsigned long long g_int_counter = 0;
+
 void main (void) {
 	sysInit();
 
 	// Test code to see if wave generator and ISRs work
 	g_wave.amp = 1;
-	g_wave.freq = 1000;
+	g_wave.freq = 50;
 	while (1)
 		;
 
@@ -27,18 +29,18 @@ void sysInit (void) {
 	SysCtlClockSet(
 			SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
 
-	IntMasterDisable();
+//	IntMasterDisable();
 
-	// TODO TODO TODO TODO: Debug this shit. It broked.
+// TODO TODO TODO TODO: Debug this shit. It broked.
 
 	g_flag_posReset = 1; // Set flag to initialize high pass filters
 	g_flag_POR = 1;	// Set flag for power-on-reset
 
 	// Initialize the timer, ADC, and SPI comm
-	rdTmrInit();
-	adcInit();
+//	rdTmrInit();
+//	adcInit();
 	spiInit();
-	alarmInit();
+//	alarmInit();
 	wrTmrInit();
 
 	IntMasterEnable();
@@ -111,20 +113,20 @@ void adcInit (void) {
 
 void spiInit (void) {
 	// Enable clock to SSI module & GPIO port
-	SysCtlPeripheralEnable(SSI_CLK);		// Enable clock to SSI module
-	SysCtlPeripheralEnable(SSI_GPIO_CLK);	// Enable clock to GPIO port for SSI
+	SysCtlPeripheralEnable(SSI_EN);		// Enable clock to SSI module
+	SysCtlPeripheralEnable(SSI_GPIO_EN);	// Enable clock to GPIO port for SSI
+
+	// Set pins for use by SSI module
+	GPIOPinTypeSSI(SSI_GPIO_BASE, DAC_CLK_PIN | DAC_FSS_PIN | DAC_TX_PIN);
 
 	// Set pin MUXes within the SSI module
 	GPIOPinConfigure(DAC_CLK_PIN_CFG);
 	GPIOPinConfigure(DAC_FSS_PIN_CFG);
 	GPIOPinConfigure(DAC_TX_PIN_CFG);
 
-	// Set pins for use by SSI module
-	GPIOPinTypeSSI(SSI_GPIO_BASE, DAC_CLK_PIN | DAC_FSS_PIN | DAC_TX_PIN);
-
 	// Configure tons o' settings for SPI/SSI
-	SSIConfigSetExpClk(DAC_SSI_BASE, SysCtlClockGet(),
-			SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, SSI_BITRATE, SSI_BIT_WIDTH);
+	SSIConfigSetExpClk(DAC_SSI_BASE, SysCtlClockGet(), SSI_FRF_MOTO_MODE_0,
+			SSI_MODE_MASTER, SSI_BITRATE, SSI_BIT_WIDTH);
 
 	SSIEnable(DAC_SSI_BASE);
 }
@@ -270,7 +272,7 @@ struct wave dataProcessor (struct buffer *input, const uint16 in_width,
 	return theWave;
 }
 
-OUT_TYPE waveGenerator (const struct wave par, const OUT_TYPE peakAmp, float *phase) {
+OUT_TYPE waveGenerator (const struct wave *par, const OUT_TYPE peakAmp, float *phase) {
 	/* Description: Generate and return a single value of a wave (t = 0) for a wave with frequency 'freq',
 	 * 				amplitude 'amp', and phase 'phase'.
 	 *
@@ -289,13 +291,15 @@ OUT_TYPE waveGenerator (const struct wave par, const OUT_TYPE peakAmp, float *ph
 	if (EMPTY == *phase)
 		*phase = 0;
 	else
-		*phase += par.freq * 2 * M_PI / WR_FREQ;
+		*phase += par->freq * 2 * M_PI / WR_FREQ;
+
+	// Loop back to 0 if phase has gone past 2*Pi
 	while (2 * M_PI < *phase)
 		*phase -= 2 * M_PI;
 
 	// y(t) = amp*peakAmp * cos(phase)
 	// Use cos(phase) because t = 0 and phase is adjusted to simulate moving time
-	return par.amp * peakAmp * cosf(*phase);
+	return par->amp * peakAmp * cosf(*phase);
 }
 
 void soundAlarm (const uint8 alarm, const int32 arg) {
@@ -401,7 +405,11 @@ void write_out_isr (void) {
 	static uint32 beatIdx = 0;
 	OUT_TYPE output;
 
-	output = waveGenerator(g_wave, MAX_OUTPUT, &mainPhase);
+	++g_int_counter;
+
+	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+
+	output = waveGenerator(&g_wave, MAX_OUTPUT, &mainPhase) / 2 + MAX_OUTPUT / 2;
 	/*if (EMPTY != beatIdx || g_flag_throwBeat) {
 	 output += waveGenerator(g_beatWave, MAX_OUTPUT, &beatPhase);
 	 if (MAX_BEAT_IDX == beatIdx) {

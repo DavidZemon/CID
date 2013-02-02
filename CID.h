@@ -8,10 +8,7 @@
 /****************
  *** Includes ***
  ****************/
-#define PART_LM4F232H5QD
 #include <inc/lm4f232h5qd.h>
-//#define PART_LM4F120H5QR
-//#include <inc/lm4f120h5qr.h>
 
 #include <inc/hw_memmap.h>
 #include <inc/hw_types.h>
@@ -45,7 +42,7 @@ void adc_isr (void);
 struct wave dataProcessor (struct buffer *input, const uint16 in_width,
 		const uint16 in_len);
 
-OUT_TYPE waveGenerator (const struct wave par, const OUT_TYPE peakAmp, float *phase);
+OUT_TYPE waveGenerator (const struct wave *par, const OUT_TYPE peakAmp, float *phase);
 
 void soundAlarm (const uint8 alarm, const int32 arg);
 

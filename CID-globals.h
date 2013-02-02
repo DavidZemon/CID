@@ -18,7 +18,7 @@ typedef signed char int8;
 typedef signed short int16;
 typedef signed int int32;
 typedef uint32 IN_TYPE;
-typedef uint16 OUT_TYPE;
+typedef int16 OUT_TYPE;
 
 // ADC/Timer hardware
 #define RD_FREQ				5000			// Timer triggers at 5 kHz
@@ -70,27 +70,27 @@ typedef uint16 OUT_TYPE;
 #define DAC_SSI_BASE		SSI1_BASE		// SSI module's base address *** CHANGE THIS IN CONJUCTION WITH SSI MODULE ***
 #define SSI_BITRATE			1000000			// Set SSI's bit rate (1 MHz)
 #define SSI_BIT_WIDTH		12				// Bit-width of SSI comms
-#define SSI_GPIO_CLK		SYSCTL_PERIPH_GPIOD
-#define	SSI_CLK				SYSCTL_PERIPH_SSI1
-#define SSI_GPIO_BASE		GPIO_PORTD_BASE
+#define SSI_GPIO_EN			SYSCTL_PERIPH_GPIOD	// Enable GPIO port connected to SSI module
+#define	SSI_EN				SYSCTL_PERIPH_SSI1	// Enable SSI module's clock
+#define SSI_GPIO_BASE		GPIO_PORTD_BASE		// SSI's GPIO port base address
 #if SSI_GPIO_BASE == GPIO_PORTD_BASE
 #define DAC_CLK_PIN			GPIO_PIN_0
 #define DAC_FSS_PIN			GPIO_PIN_1
 #define DAC_TX_PIN			GPIO_PIN_3
-#define DAC_CLK_PIN_CFG		GPIO_PCTL_PD0_SSI1CLK
-#define DAC_FSS_PIN_CFG		GPIO_PCTL_PD1_SSI1FSS
-#define DAC_TX_PIN_CFG		GPIO_PCTL_PD3_SSI1TX
+#define DAC_CLK_PIN_CFG		GPIO_PD0_SSI1CLK
+#define DAC_FSS_PIN_CFG		GPIO_PD1_SSI1FSS
+#define DAC_TX_PIN_CFG		GPIO_PD3_SSI1TX
 #elif SSI_GPIO_BASE == GPIO_PORTF_BASE
 #define DAC_CLK_PIN			GPIO_PIN_2
 #define DAC_FSS_PIN			GPIO_PIN_3
 #define DAC_TX_PIN			GPIO_PIN_1
-#define DAC_CLK_PIN_CFG		GPIO_PCTL_PF2_SSI1CLK
-#define DAC_FSS_PIN_CFG		GPIO_PCTL_PF3_SSI1FSS
-#define DAC_TX_PIN_CFG		GPIO_PCTL_PF1_SSI1TX
+#define DAC_CLK_PIN_CFG		GPIO_PF2_SSI1CLK
+#define DAC_FSS_PIN_CFG		GPIO_PF3_SSI1FSS
+#define DAC_TX_PIN_CFG		GPIO_PF1_SSI1TX
 #endif
 
 // SPI Software
-#define WR_FREQ				25000			// Write to the DAC at 25 kHz
+#define WR_FREQ				44101			// Write to the DAC at 25 kHz
 #define MAX_OUTPUT			0x3ff			// 12-bit maximum for the DAC
 // Floating point/Trig
 #ifndef M_PI
