@@ -38,9 +38,9 @@ typedef int16 OUT_TYPE;
 #define Z_PIN				GPIO_PIN_6
 
 // Buffer
-#define BUFFER_SIZE 		16				// Sample buffer size
+#define BUFFER_SIZE 		4				// Sample buffer size
 #define EMPTY				-1				// -1 will represent an empty field
-#define AXES				3				// There are 3 axes between X, Y, and Z
+#define AXES				3				// There are 3 axes: X, Y, and Z
 #define X					0				// First step of the sequencer is the X-axis
 #define Y					1
 #define Z					2
@@ -90,7 +90,7 @@ typedef int16 OUT_TYPE;
 #endif
 
 // SPI Software
-#define WR_FREQ				44101			// Write to the DAC at 25 kHz
+#define WR_FREQ				44100			// Write to the DAC at 25 kHz
 #define MAX_OUTPUT			0x3ff			// 12-bit maximum for the DAC
 // Floating point/Trig
 #ifndef M_PI
@@ -99,28 +99,32 @@ typedef int16 OUT_TYPE;
 #define END_POINT			2F * M_PI
 #define STEP				END_POINT / (float) WR_FREQ
 
+// Frequency Constants
+#define MAX_OUT_FREQ		16000
+#define MIN_OUT_FREQ		40
+
 // Error codes -- Numbers chosen for legibility during serial output
 #define INCORRECT_FIFO_SIZE	7
 #define BUFFER_FULL			15
-#define BUFFER_EMPTY		3
+#define BUFFER_EMPTY		4
 
 /************************
  *** Global Variables ***
  ************************/
 // Circular buffer
 struct buffer {
-	IN_TYPE		**data;
-	uint16		size;		// Current size (length) of the buffer;
-	uint16		length;		// Maximum length of the buffer
-	uint8		width;		// Maximum width of the buffer
-	uint16		wr_ptr;
-	uint16		rd_ptr;
+		IN_TYPE **data;
+		uint16 size;		// Current size (length) of the buffer;
+		uint16 length;		// Maximum length of the buffer
+		uint8 width;		// Maximum width of the buffer
+		uint16 wr_ptr;
+		uint16 rd_ptr;
 };
 
 // Struct to contain information for a single wave
 struct wave {
-	uint16		freq;
-	float		amp;
+		uint16 freq;
+		float amp;
 };
 
 extern struct buffer g_buffer_in;
@@ -129,5 +133,5 @@ extern struct wave g_beatWave;
 extern uint8 g_flag_posReset;
 extern uint8 g_flag_throwBeat;
 extern uint8 g_flag_POR;
-
+extern uint8 g_flag_newInput;
 #endif /* CID_GLOBALS_H_ */

@@ -11,14 +11,17 @@ void main (void) {
 	sysInit();
 
 	// Test code to see if wave generator and ISRs work
-	g_wave.amp = 1;
-	g_wave.freq = 50;
-	while (1)
-		;
+	/*	g_wave.amp = 1;
+	 g_wave.freq = 220;
+	 while (1)
+	 if (BUFFER_SIZE - 1 <= g_buffer_in.size)
+	 g_buffer_in.size = 0;*/
 
 	while (1)
-		if (g_buffer_in.size)
+		if (g_flag_newInput) {
+			g_flag_newInput = 0;
 			g_wave = dataProcessor(&g_buffer_in, AXES, BUFFER_SIZE);
+		}
 }
 
 void sysInit (void) {
@@ -29,18 +32,15 @@ void sysInit (void) {
 	SysCtlClockSet(
 			SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
 
-//	IntMasterDisable();
-
-// TODO TODO TODO TODO: Debug this shit. It broked.
-
 	g_flag_posReset = 1; // Set flag to initialize high pass filters
 	g_flag_POR = 1;	// Set flag for power-on-reset
+	g_flag_newInput = 0; // Set flag to show no new input
 
 	// Initialize the timer, ADC, and SPI comm
-//	rdTmrInit();
-//	adcInit();
+	rdTmrInit();
+	adcInit();
 	spiInit();
-//	alarmInit();
+	alarmInit();
 	wrTmrInit();
 
 	IntMasterEnable();
@@ -71,6 +71,9 @@ void rdTmrInit (void) {
 	// Load the timer with the proper delay
 	TimerLoadSet(TIMER0_BASE, TIMER_A, delay);
 
+	// Register the ISR
+	// No ISR should be registered - it will trigger the ADC which, when finished, will call an ISR
+
 	// Enable Timer0 A
 	TimerEnable(TIMER0_BASE, TIMER_A);
 }
@@ -84,6 +87,9 @@ void adcInit (void) {
 	GPIODirModeSet(ACCEL_PORT_BASE, X_PIN | Y_PIN | Z_PIN, GPIO_DIR_MODE_IN);
 	GPIOPadConfigSet(ACCEL_PORT_BASE, X_PIN | Y_PIN | Z_PIN, GPIO_STRENGTH_2MA,
 			GPIO_PIN_TYPE_ANALOG);
+
+	// Set pins to be used with ADC
+	GPIOPinTypeADC(ACCEL_PORT_BASE, X_PIN | Y_PIN | Z_PIN);
 
 	// Set ADC0's sequence "SEQUENCE" to always (constantly) trigger
 	// and give it interrupt priority 1 (second-highest - data output is more important)
@@ -101,9 +107,14 @@ void adcInit (void) {
 	// place the average in the FIFO
 	ADCHardwareOversampleConfigure(ADC0_BASE + ACCEL_ADC, HARDWARE_AVERAGER);
 
+	// Sets the VRef source for the ADC (internal or external 3v)
+	ADCReferenceSet(ADC0_BASE + ACCEL_ADC, ADC_REF_INT);
+
 	ADCSequenceEnable(ADC0_BASE + ACCEL_ADC, SEQUENCE);
+
+	//ADCIntRegister(ADC0_BASE + SEQUENCE, SEQUENCE, adc_isr); // Don't know why this faults - but we just set the ISR in the startup file
 	ADCIntEnable(ADC0_BASE + ACCEL_ADC, SEQUENCE);
-	ADCIntRegister(ADC0_BASE + ACCEL_ADC, SEQUENCE, adc_isr);
+
 #if ACCEL_ADC == 0
 	IntEnable(INT_ADC0SS0 + SEQUENCE);
 #else
@@ -217,8 +228,10 @@ struct wave dataProcessor (struct buffer *input, const uint16 in_width,
 	 */
 
 	// Declare variables for high pass filter and integrator buffers
-	static IN_TYPE min;
-	static IN_TYPE max;
+	static IN_TYPE input_min = EMPTY;
+	static IN_TYPE input_max = EMPTY;
+	static OUT_TYPE output_min = EMPTY;
+	static OUT_TYPE output_max = EMPTY;
 	static struct buffer *hpf1;
 	static struct buffer *hpf2;
 	static struct buffer *hpf3;
@@ -253,22 +266,31 @@ struct wave dataProcessor (struct buffer *input, const uint16 in_width,
 	// Note: All columns have the same min and max values
 	uint8 col;
 	for (col = 0; col < in_width; ++col) {
-		if (max < input->data[col][input->rd_ptr])
-			max = input->data[col][input->rd_ptr];
-		else if (min > input->data[col][input->rd_ptr])
-			min = input->data[col][input->rd_ptr];
+		if (input_max < input->data[col][input->rd_ptr] || EMPTY == input_max)
+			input_max = input->data[col][input->rd_ptr];
+		else if (input_min > input->data[col][input->rd_ptr] || EMPTY == input_min)
+			input_min = input->data[col][input->rd_ptr];
 	}
 
-	// TODO: Double integral of acceleration to find position
-	//dspRead();
-	highPass(input, hpf1);
+	// Double integral of acceleration to find position
+	/*highPass(input, hpf1);
 	updateIntegrator(hpf1, intBuf1);
 	highPass(intBuf1, hpf2);
 	updateIntegrator(hpf2, intBuf2);
-	highPass(intBuf2, hpf3);
+	highPass(intBuf2, hpf3);*/
 
-	// TODO: Find new amplitude and frequency
+	// Find new max and mins for output
+	for (col = 0; col < in_width; ++col) {
+		if (output_max < hpf3->data[col][hpf3->rd_ptr] || EMPTY == output_max)
+			output_max = hpf3->data[col][hpf3->rd_ptr];
+		else if (output_min > hpf3->data[col][hpf3->rd_ptr] || EMPTY == output_min)
+			output_min = hpf3->data[col][hpf3->rd_ptr];
+	}
 
+	// Find new amplitude and frequency
+//	theWave.freq = (MAX_OUT_FREQ - MIN_OUT_FREQ) * ((float) (hpf3->data[FREQ_AXIS][hpf3->rd_ptr] - output_min)) / (output_max - output_min);
+	theWave.freq = (MAX_OUT_FREQ - MIN_OUT_FREQ) * ((float) (input->data[FREQ_AXIS][hpf3->rd_ptr] - input_min)) / (input_max - input_min);
+	theWave.amp = ((float) (input->data[AMP_AXIS][hpf3->rd_ptr] - input_min)) / (input_max - input_min);
 	return theWave;
 }
 
@@ -405,8 +427,6 @@ void write_out_isr (void) {
 	static uint32 beatIdx = 0;
 	OUT_TYPE output;
 
-	++g_int_counter;
-
 	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
 
 	output = waveGenerator(&g_wave, MAX_OUTPUT, &mainPhase) / 2 + MAX_OUTPUT / 2;
@@ -424,14 +444,16 @@ void write_out_isr (void) {
 void adc_isr (void) {
 	IN_TYPE tempBuffer[AXES]; // Temporary buffer capable of holding 5 sequences
 
+	++g_int_counter;
+
 	// Clear the interrupt flag
 	ADCIntClear(ADC0_BASE + ACCEL_ADC, SEQUENCE);
 
 	// Check buffer size - if it's full, sound the alarm
 	// TODO: After ensuring this never happens, change it to a while loop to prevent
 	//		 killing the program on the off-chance that it does
-	if (BUFFER_SIZE == g_buffer_in.size)
-		soundAlarm(BUFFER_FULL, EMPTY); // Holding function - execution will never return
+//	if (BUFFER_SIZE == g_buffer_in.size)
+//		soundAlarm(BUFFER_FULL, EMPTY); // Holding function - execution will never return
 
 	// Retrieve data from ADC's FIFO
 	ADCSequenceDataGet(ADC0_BASE + ACCEL_ADC, SEQUENCE, (unsigned long *) tempBuffer);
@@ -445,7 +467,7 @@ void adc_isr (void) {
 	if (BUFFER_SIZE == ++g_buffer_in.wr_ptr)
 		g_buffer_in.wr_ptr = 0;
 
-	++g_buffer_in.size;
+	g_flag_newInput = 1;
 }
 
 void pos_reset_isr (void) {

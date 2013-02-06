@@ -15,3 +15,4 @@ struct wave g_beatWave;
 uint8 g_flag_throwBeat;
 uint8 g_flag_posReset;
 uint8 g_flag_POR;
+uint8 g_flag_newInput;
