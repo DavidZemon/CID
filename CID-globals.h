@@ -28,7 +28,7 @@ typedef int16 OUT_TYPE;
 #define ACCEL_INT_PRI		1
 
 // Accelerometer pins
-#define ACCEL_SYSCTL		SYSCTL_PERIPH_GPIOE
+#define ACCEL_GPIO_SYSCTL	SYSCTL_PERIPH_GPIOE
 #define ACCEL_PORT_BASE		GPIO_PORTE_BASE
 #define X_CHANNEL			ADC_CTL_CH8		// Axis ADC channel
 #define Y_CHANNEL			ADC_CTL_CH9

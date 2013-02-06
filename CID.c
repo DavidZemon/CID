@@ -37,7 +37,7 @@ void sysInit (void) {
 	g_flag_newInput = 0; // Set flag to show no new input
 
 	// Initialize the timer, ADC, and SPI comm
-	rdTmrInit();
+//	rdTmrInit();
 	adcInit();
 	spiInit();
 	alarmInit();
@@ -80,8 +80,8 @@ void rdTmrInit (void) {
 
 void adcInit (void) {
 	// Enable clock to accelerometer's GPIO port and ADC
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
-	SysCtlPeripheralEnable(ACCEL_SYSCTL);
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0 + ACCEL_ADC);
+	SysCtlPeripheralEnable(ACCEL_GPIO_SYSCTL);
 
 	// Connect pins to the ADC that are connected to the accelerometer
 	GPIODirModeSet(ACCEL_PORT_BASE, X_PIN | Y_PIN | Z_PIN, GPIO_DIR_MODE_IN);
@@ -91,8 +91,8 @@ void adcInit (void) {
 	// Set pins to be used with ADC
 	GPIOPinTypeADC(ACCEL_PORT_BASE, X_PIN | Y_PIN | Z_PIN);
 
-	// Set ADC0's sequence "SEQUENCE" to always (constantly) trigger
-	// and give it interrupt priority 1 (second-highest - data output is more important)
+	// Set ADC0's sequence "SEQUENCE" to trigger from the timer
+	// and give it interrupt priority ACCEL_INT_PRI (second-highest - data output is more important)
 	ADCSequenceConfigure(ADC0_BASE + ACCEL_ADC, SEQUENCE, ADC_TRIGGER_TIMER,
 			ACCEL_INT_PRI);
 
