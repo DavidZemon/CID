@@ -16,3 +16,5 @@ uint8 g_flag_throwBeat;
 uint8 g_flag_posReset;
 uint8 g_flag_POR;
 uint8 g_flag_newInput;
+uint8 g_flag_calibration;
+IN_TYPE g_inputOffset[AXES];

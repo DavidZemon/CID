@@ -13,15 +13,15 @@
 // Typedefs
 typedef unsigned char uint8;
 typedef unsigned short uint16;
-typedef unsigned int uint32;
+typedef unsigned long uint32;
 typedef signed char int8;
 typedef signed short int16;
-typedef signed int int32;
-typedef uint32 IN_TYPE;
-typedef int16 OUT_TYPE;
+typedef signed long int32;
+typedef int16 IN_TYPE;
+typedef uint16 OUT_TYPE;
 
 // ADC/Timer hardware
-#define RD_FREQ				5000			// Timer triggers at 5 kHz
+#define RD_FREQ				10000			// Timer triggers the ADC at RD_FREQ Hz
 #define ACCEL_ADC			0				// ADC in use for accelerometer
 #define SEQUENCE			1				// ADC Sequencer
 #define HARDWARE_AVERAGER	4				// Average 4 samples (choose from 2^1 through 2^4)
@@ -39,16 +39,16 @@ typedef int16 OUT_TYPE;
 
 // Buffer
 #define BUFFER_SIZE 		4				// Sample buffer size
-#define EMPTY				-1				// -1 will represent an empty field
+#define EMPTY				LONG_MAX		// EMPTY will represent an empty field
 #define AXES				3				// There are 3 axes: X, Y, and Z
 #define X					0				// First step of the sequencer is the X-axis
 #define Y					1
 #define Z					2
 
 // DSP calculation
-#define BEAT_AXIS			X
-#define FREQ_AXIS			Y
-#define AMP_AXIS			Z
+#define BEAT_AXIS			Z
+#define FREQ_AXIS			X
+#define AMP_AXIS			Y
 #define FREQ_POS_BASE		261.63
 #define AMP_POS_BASE		10
 
@@ -100,20 +100,22 @@ typedef int16 OUT_TYPE;
 #define STEP				END_POINT / (float) WR_FREQ
 
 // Frequency Constants
-#define MAX_OUT_FREQ		16000
-#define MIN_OUT_FREQ		40
+#define MAX_OUT_IDX			60
+#define MIN_OUT_IDX			0
+#define MAX_OUT_FREQ		820
+#define MIN_OUT_FREQ		140
 
 // Error codes -- Numbers chosen for legibility during serial output
 #define INCORRECT_FIFO_SIZE	7
 #define BUFFER_FULL			15
-#define BUFFER_EMPTY		4
+#define BUFFER_EMPTY		3
 
 /************************
  *** Global Variables ***
  ************************/
 // Circular buffer
 struct buffer {
-		IN_TYPE **data;
+		IN_TYPE data[AXES][BUFFER_SIZE];
 		uint16 size;		// Current size (length) of the buffer;
 		uint16 length;		// Maximum length of the buffer
 		uint8 width;		// Maximum width of the buffer
@@ -127,11 +129,13 @@ struct wave {
 		float amp;
 };
 
-extern struct buffer g_buffer_in;
-extern struct wave g_wave;
-extern struct wave g_beatWave;
-extern uint8 g_flag_posReset;
-extern uint8 g_flag_throwBeat;
-extern uint8 g_flag_POR;
-extern uint8 g_flag_newInput;
+extern struct buffer g_buffer_in;		// global accelerometer / ADC input buffer
+extern struct wave g_wave;				// global output waveform
+extern struct wave g_beatWave;			// global snare drum waveform
+extern uint8 g_flag_posReset;			// flag to recalibrate origin axis and system position
+extern uint8 g_flag_throwBeat;			// flag to initiate superposition with snare waveform
+extern uint8 g_flag_POR;				// flag indicating PowerOnReset condition
+extern uint8 g_flag_newInput;			// flag indicating availability of new input samples
+extern uint8 g_flag_calibration;		// flag indicating whether or not calibration is in progress
+extern IN_TYPE g_inputOffset[AXES];		// maintains origin axis for unsigned integrations
 #endif /* CID_GLOBALS_H_ */

@@ -11,16 +11,16 @@ void main (void) {
 	sysInit();
 
 	// Test code to see if wave generator and ISRs work
-	/*	g_wave.amp = 1;
+	/*g_wave.amp = 1;
 	 g_wave.freq = 220;
 	 while (1)
 	 if (BUFFER_SIZE - 1 <= g_buffer_in.size)
 	 g_buffer_in.size = 0;*/
 
 	while (1)
-		if (g_flag_newInput) {
+		if (g_flag_newInput && !g_flag_calibration) {
 			g_flag_newInput = 0;
-			g_wave = dataProcessor(&g_buffer_in, AXES, BUFFER_SIZE);
+			g_wave = dataProcessor(&g_buffer_in);
 		}
 }
 
@@ -36,17 +36,24 @@ void sysInit (void) {
 	g_flag_POR = 1;	// Set flag for power-on-reset
 	g_flag_newInput = 0; // Set flag to show no new input
 
+	g_flag_calibration = 1;	// Tell the system to begin calibration
+
+	// Initialize the input buffer
+	bufferInit(&g_buffer_in, (IN_TYPE) EMPTY);
+
+	// Clear the offset so as to not affect the input values prior to calibration
+	uint8 axis;
+	for (axis = 0; axis < AXES; ++axis)
+		g_inputOffset[axis] = 0;
+
 	// Initialize the timer, ADC, and SPI comm
-//	rdTmrInit();
+	rdTmrInit();
 	adcInit();
 	spiInit();
 	alarmInit();
 	wrTmrInit();
 
 	IntMasterEnable();
-
-	// Initialize the input buffer
-	//bufferInit(&g_buffer_in, AXES, BUFFER_SIZE, EMPTY);
 }
 
 void rdTmrInit (void) {
@@ -182,30 +189,27 @@ void wrTmrInit (void) {
 	TimerEnable(TIMER1_BASE, TIMER_A);
 }
 
-void bufferInit (struct buffer *buf, uint8 width, uint16 length, IN_TYPE initVal) {
+void bufferInit (struct buffer *buf, IN_TYPE initVal) {
 	/* Description:
 	 *
 	 * @param
 	 */
-	uint16 row;
-	uint8 col;
+	uint16 i;
+	uint8 axis;
 
-	buf->length = length;
-	buf->width = width;
+	buf->length = BUFFER_SIZE;
+	buf->width = AXES;
 	buf->size = 0;
 	buf->wr_ptr = 0;
 	buf->rd_ptr = 0;
-	buf->data = (IN_TYPE **) malloc(buf->width * sizeof(IN_TYPE *));
 
-	for (col = X; col < buf->width; ++col) {
-		g_buffer_in.data[col] = (uint32 *) malloc(buf->length * sizeof(IN_TYPE));
-		for (row = 0; row < buf->length; ++row)
-			g_buffer_in.data[col][row] = initVal;
+	for (axis = 0; axis < buf->width; ++axis) {
+		for (i = 0; i < buf->length; ++i)
+			g_buffer_in.data[axis][i] = initVal;
 	}
 }
 
-struct wave dataProcessor (struct buffer *input, const uint16 in_width,
-		const uint16 in_len) {
+struct wave dataProcessor (struct buffer *input) {
 	/* Description: Perform signal processing on the input buffer to generate an output buffer
 	 *
 	 * Precondition 1: Input buffer must have the same length (number of rows) for each column
@@ -227,70 +231,100 @@ struct wave dataProcessor (struct buffer *input, const uint16 in_width,
 	 * @return		None
 	 */
 
+	// Temporary local variables (the normal, non-static ones)
+	float freqPos;
+	struct wave theWave;
+	uint8 axis;
+
 	// Declare variables for high pass filter and integrator buffers
-	static IN_TYPE input_min = EMPTY;
-	static IN_TYPE input_max = EMPTY;
-	static OUT_TYPE output_min = EMPTY;
-	static OUT_TYPE output_max = EMPTY;
-	static struct buffer *hpf1;
-	static struct buffer *hpf2;
-	static struct buffer *hpf3;
-	static struct buffer *intBuf1;
-	static struct buffer *intBuf2;
+	static IN_TYPE input_min[AXES];
+	static IN_TYPE input_max[AXES];
+	static IN_TYPE output_min[AXES];
+	static IN_TYPE output_max[AXES];
+	static struct buffer hpf1;
+	static struct buffer hpf2;
+	static struct buffer hpf3;
+	static struct buffer intBuf1;
+	static struct buffer intBuf2;
 
 	// If the positional reset flag is set, clear the HPF and integrator buffers
-	if (g_flag_posReset) {
-		if (g_flag_POR) { // Allocate memory if Power On Reset...
-			hpf1 = (struct buffer *) malloc(sizeof(struct buffer));
-			hpf2 = (struct buffer *) malloc(sizeof(struct buffer));
-			hpf3 = (struct buffer *) malloc(sizeof(struct buffer));
-			intBuf1 = (struct buffer *) malloc(sizeof(struct buffer));
-			intBuf2 = (struct buffer *) malloc(sizeof(struct buffer));
-			g_flag_POR = 0;
-		}
-
+	if (1 == g_flag_posReset) {
 		// Initialize the buffer
-		bufferInit(hpf1, AXES, BUFFER_SIZE, 0);
-		bufferInit(hpf2, AXES, BUFFER_SIZE, 0);
-		bufferInit(hpf3, AXES, BUFFER_SIZE, 0);
-		bufferInit(intBuf1, AXES, BUFFER_SIZE, 0);
-		bufferInit(intBuf2, AXES, BUFFER_SIZE, 0);
+		bufferInit(&hpf1, 0);
+		bufferInit(&hpf2, 0);
+		bufferInit(&hpf3, 0);
+		bufferInit(&intBuf1, 0);
+		bufferInit(&intBuf2, 0);
+
+		for (axis = 0; axis < AXES; ++axis) {
+			output_min[axis] = output_max[axis] = input_min[axis] = input_max[axis] =
+					(IN_TYPE) EMPTY;
+		}
 
 		g_flag_posReset = 0;
 	}
 
-	// Initialize output wave to 0 Hz with amplitude 0
-	static struct wave theWave = { 0, 0 };
-
 	// For each new data point, find out if the min and max points should be extended
 	// Note: All columns have the same min and max values
-	uint8 col;
-	for (col = 0; col < in_width; ++col) {
-		if (input_max < input->data[col][input->rd_ptr] || EMPTY == input_max)
-			input_max = input->data[col][input->rd_ptr];
-		else if (input_min > input->data[col][input->rd_ptr] || EMPTY == input_min)
-			input_min = input->data[col][input->rd_ptr];
+	for (axis = 0; axis < AXES; ++axis) {
+		if ((input_max[axis] < input->data[axis][input->rd_ptr])
+				|| ((IN_TYPE) EMPTY == input_max[axis]))
+			input_max[axis] = input->data[axis][input->rd_ptr];
+		else if (input_min[axis] > input->data[axis][input->rd_ptr]
+				|| (IN_TYPE) EMPTY == input_min[axis])
+			input_min[axis] = input->data[axis][input->rd_ptr];
 	}
 
 	// Double integral of acceleration to find position
-	/*highPass(input, hpf1);
-	updateIntegrator(hpf1, intBuf1);
-	highPass(intBuf1, hpf2);
-	updateIntegrator(hpf2, intBuf2);
-	highPass(intBuf2, hpf3);*/
+	//	highPass(input, &hpf1);
+	//	updateIntegrator(&hpf1, &intBuf1);
+	//	highPass(&intBuf1, &hpf2);
+	//	updateIntegrator(&hpf2, &intBuf2);
+	//	highPass(&intBuf2, &hpf3);
+
+	struct buffer *outBuf = &hpf2;
 
 	// Find new max and mins for output
-	for (col = 0; col < in_width; ++col) {
-		if (output_max < hpf3->data[col][hpf3->rd_ptr] || EMPTY == output_max)
-			output_max = hpf3->data[col][hpf3->rd_ptr];
-		else if (output_min > hpf3->data[col][hpf3->rd_ptr] || EMPTY == output_min)
-			output_min = hpf3->data[col][hpf3->rd_ptr];
+	for (axis = 0; axis < AXES; ++axis) {
+		if (output_max[axis] < outBuf->data[axis][outBuf->rd_ptr]
+				|| (OUT_TYPE) EMPTY == output_max[axis])
+			output_max[axis] = outBuf->data[axis][outBuf->rd_ptr];
+		else if (output_min[axis] > hpf3.data[axis][hpf3.rd_ptr]
+				|| (OUT_TYPE) EMPTY == output_min[axis])
+			output_min[axis] = outBuf->data[axis][outBuf->rd_ptr];
 	}
 
-	// Find new amplitude and frequency
-//	theWave.freq = (MAX_OUT_FREQ - MIN_OUT_FREQ) * ((float) (hpf3->data[FREQ_AXIS][hpf3->rd_ptr] - output_min)) / (output_max - output_min);
-	theWave.freq = (MAX_OUT_FREQ - MIN_OUT_FREQ) * ((float) (input->data[FREQ_AXIS][hpf3->rd_ptr] - input_min)) / (input_max - input_min);
-	theWave.amp = ((float) (input->data[AMP_AXIS][hpf3->rd_ptr] - input_min)) / (input_max - input_min);
+	/************************************
+	 * Find new amplitude and frequency *
+	 ***********************************/
+	// Find position as a percentage 0.0 - 1.0
+	if (output_min[FREQ_AXIS] == output_max[FREQ_AXIS])
+		// Avoid a divide-by-zero scenario
+		freqPos = 0.5;
+	else
+		freqPos = ((float) (outBuf->data[FREQ_AXIS][outBuf->rd_ptr]
+				- output_min[FREQ_AXIS]))
+				/ (output_max[FREQ_AXIS] - output_min[FREQ_AXIS]);
+	if (output_min[AMP_AXIS] == output_max[AMP_AXIS])
+		theWave.amp = 0.5;
+	else
+		// theWave.amp = ((float) (outBuf->data[AMP_AXIS][outBuf->rd_ptr] - output_min))
+		//	/ (output_max - output_min);
+		theWave.amp = 0.5;
+
+	// Find indice of note
+	freqPos *= (MAX_OUT_IDX - MIN_OUT_IDX);
+
+	// Find frequency in Hz
+	theWave.freq = 40 * ((float) exp((double) 0.0888650234 * (double) freqPos)) - 12.5;
+
+	// Test values - directly proportional to input - not filtered or integrated
+	theWave.freq = (MAX_OUT_FREQ - MIN_OUT_FREQ)
+			* ((float) (input->data[FREQ_AXIS][input->rd_ptr] - input_min[FREQ_AXIS]))
+			/ (input_max - input_min);
+	theWave.amp = ((float) (input->data[AMP_AXIS][input->rd_ptr] - input_min[FREQ_AXIS]))
+			/ (input_max[FREQ_AXIS] - input_min[FREQ_AXIS]);
+
 	return theWave;
 }
 
@@ -359,30 +393,21 @@ void highPass (struct buffer *input, struct buffer *output) {
 	 * 				Accel -> ADC -> HPF -> Integrator -> HPF -> Integrator -> HPF -> Position
 	 */
 
-	uint8 axis, nxt_idx, curr_idx, prev_idx;
-	nxt_idx = input->wr_ptr;
+	uint8 axis, curr_idx, prev_idx;
 
 	// Prepare correct previous sample indexes in circular buffer
-	if (0 == nxt_idx) {
-		curr_idx = BUFFER_SIZE - 1;
-		prev_idx = BUFFER_SIZE - 2;
-	} else if (1 == nxt_idx) {
-		curr_idx = 0;
-		prev_idx = BUFFER_SIZE - 1;
-	} else {
-		curr_idx = nxt_idx - 1;
-		prev_idx = nxt_idx - 2;
-	}
+	curr_idx = (input->wr_ptr + BUFFER_SIZE - 1) % BUFFER_SIZE;
+	prev_idx = (input->wr_ptr + BUFFER_SIZE - 2) % BUFFER_SIZE;
 
 	// Perform HPF calculation for current samples on both position-dependent axes
-	for (axis = X; axis < AXES; ++axis)
+	for (axis = 0; axis < AXES; ++axis)
 		if (axis == FREQ_AXIS || axis == AMP_AXIS)
 			output->data[axis][output->wr_ptr] = ALPHA
 					* (output->data[axis][curr_idx] + input->data[axis][curr_idx]
 							- input->data[axis][prev_idx]);
 
 	// Loop the write pointer if it has reached the end of the buffer
-	if (BUFFER_SIZE == ++output->wr_ptr)
+	if (BUFFER_SIZE == ++(output->wr_ptr))
 		output->wr_ptr = 0;
 
 	// Integration is next: subtract current sample from previous sample
@@ -390,31 +415,33 @@ void highPass (struct buffer *input, struct buffer *output) {
 
 void updateIntegrator (struct buffer *input, struct buffer *output) {
 	/* Description: performs discrete integration on the input buffer
-	 * 				discrete integration of Yn = Xn - Xn-1
+	 * 				discrete integration of Yn = Xn + Xn-1
 	 */
 
-	uint8 axis, nxt_idx, curr_idx, prev_idx;
-	nxt_idx = input->wr_ptr;
+	uint8 axis, curr_idx, prev_idx;
 
 	// Prepare correct previous sample indexes in circular buffer
-	if (0 == nxt_idx) {
-		curr_idx = BUFFER_SIZE - 1;
-		prev_idx = BUFFER_SIZE - 2;
-	} else if (1 == nxt_idx) {
-		curr_idx = 0;
-		prev_idx = BUFFER_SIZE - 1;
-	} else {
-		curr_idx = nxt_idx - 1;
-		prev_idx = nxt_idx - 2;
-	}
+	curr_idx = (input->wr_ptr + BUFFER_SIZE - 1) % BUFFER_SIZE;
+	prev_idx = (input->wr_ptr + BUFFER_SIZE - 2) % BUFFER_SIZE;
 
-	for (axis = X; axis < AXES; ++axis)
-		if (axis == FREQ_AXIS || axis == AMP_AXIS)
-			output->data[axis][output->wr_ptr] = input->data[axis][curr_idx]
-					- input->data[axis][prev_idx];
+	// Perform integration for current samples on both position-dependent axes
+	for (axis = 0; axis < AXES; ++axis)
+		if (axis == FREQ_AXIS || axis == AMP_AXIS) {
+			if (0 < input->data[axis][prev_idx] && 0 < input->data[axis][curr_idx]
+					&& 0 > input->data[axis][prev_idx] + input->data[axis][curr_idx])
+				output->data[axis][output->wr_ptr] = (IN_TYPE) LONG_MAX;
+
+			else if (0 > input->data[axis][prev_idx] && 0 > input->data[axis][curr_idx]
+					&& 0 < input->data[axis][prev_idx] + input->data[axis][curr_idx])
+				output->data[axis][output->wr_ptr] = (IN_TYPE) LONG_MIN;
+
+			else
+				output->data[axis][output->wr_ptr] = input->data[axis][curr_idx]
+						+ input->data[axis][prev_idx];
+		}
 
 	// Loop the write pointer if it has reached the end of the buffer
-	if (BUFFER_SIZE == ++output->wr_ptr)
+	if (BUFFER_SIZE == ++(output->wr_ptr))
 		output->wr_ptr = 0;
 }
 
@@ -423,8 +450,8 @@ void write_out_isr (void) {
 	 * 				Write g_out_buffer to SPI (make sound through the DAC!)
 	 */
 	static float mainPhase = EMPTY;
-	static float beatPhase = EMPTY;
-	static uint32 beatIdx = 0;
+	/*static float beatPhase = EMPTY;
+	 static uint32 beatIdx = 0;*/
 	OUT_TYPE output;
 
 	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
@@ -442,9 +469,8 @@ void write_out_isr (void) {
 }
 
 void adc_isr (void) {
-	IN_TYPE tempBuffer[AXES]; // Temporary buffer capable of holding 5 sequences
-
-	++g_int_counter;
+	unsigned long tempBuffer[AXES]; // Temporary buffer to retreive ADC samples - must be unsigned long
+	uint8 i;
 
 	// Clear the interrupt flag
 	ADCIntClear(ADC0_BASE + ACCEL_ADC, SEQUENCE);
@@ -452,21 +478,37 @@ void adc_isr (void) {
 	// Check buffer size - if it's full, sound the alarm
 	// TODO: After ensuring this never happens, change it to a while loop to prevent
 	//		 killing the program on the off-chance that it does
-//	if (BUFFER_SIZE == g_buffer_in.size)
-//		soundAlarm(BUFFER_FULL, EMPTY); // Holding function - execution will never return
+	//	if (BUFFER_SIZE == g_buffer_in.size)
+	//		soundAlarm(BUFFER_FULL, EMPTY); // Holding function - execution will never return
 
 	// Retrieve data from ADC's FIFO
 	ADCSequenceDataGet(ADC0_BASE + ACCEL_ADC, SEQUENCE, (unsigned long *) tempBuffer);
 
 	// Place data into global buffer
-	uint16 axis;
-	for (axis = X; axis < AXES; ++axis)
-		g_buffer_in.data[axis][g_buffer_in.wr_ptr] = tempBuffer[axis];
+	uint8 axis;
+	for (axis = 0; axis < AXES; ++axis)
+		g_buffer_in.data[axis][g_buffer_in.wr_ptr] = tempBuffer[axis]
+				- g_inputOffset[axis];
 
 	// Loop the write pointer if it has reached the end of the buffer
-	if (BUFFER_SIZE == ++g_buffer_in.wr_ptr)
+	if (BUFFER_SIZE == ++(g_buffer_in.wr_ptr)) {
 		g_buffer_in.wr_ptr = 0;
 
+		// If calibration has not been completed, average all values in the buffer and set as the "offset"
+		if (g_flag_calibration) {
+			g_flag_calibration = 0;
+			for (axis = 0; axis < AXES; ++axis) {
+				g_inputOffset[axis] = 0;
+				for (i = 0; i < BUFFER_SIZE; ++i) {
+					g_inputOffset[axis] += g_buffer_in.data[axis][i];
+					g_buffer_in.data[axis][i] = (IN_TYPE) EMPTY;
+				}
+				g_inputOffset[axis] /= BUFFER_SIZE;
+			}
+		}
+	}
+
+	// Notify the main function that input is ready to be read
 	g_flag_newInput = 1;
 }
 
@@ -475,7 +517,11 @@ void pos_reset_isr (void) {
 	 *				Uses the corner user switch, SW5, GPIO pin PM4
 	 *				Use filter initialization function with zero parameter to fill buffers w/ 0
 	 */
+	uint8 axis;
 
 	//TODO: Set as GPIO interrupt
 	g_flag_posReset = 1;
+	g_flag_calibration = 1;
+	for (axis = 0; axis < AXES; ++axis)
+		g_inputOffset[axis] = 0;
 }

@@ -29,6 +29,7 @@
 #include "CID-globals.h"
 #include <math.h>
 #include <stdlib.h>
+#include <limits.h>
 
 /**********************************
  *** Interrupt Service Routines ***
@@ -39,8 +40,7 @@ void adc_isr (void);
 /*************************
  *** General functions ***
  *************************/
-struct wave dataProcessor (struct buffer *input, const uint16 in_width,
-		const uint16 in_len);
+struct wave dataProcessor (struct buffer *input);
 
 OUT_TYPE waveGenerator (const struct wave *par, const OUT_TYPE peakAmp, float *phase);
 
@@ -52,7 +52,7 @@ void highPass (struct buffer *input, struct buffer *output);
 
 void updateIntegrator (struct buffer *input, struct buffer *output);
 
-void bufferInit (struct buffer *buf, uint8 width, uint16 length, IN_TYPE initVal);
+void bufferInit (struct buffer *buf, IN_TYPE initVal);
 
 #ifdef DEBUG
 void __error__(int8 *pcFilename, unsigned long ulLine) {}
