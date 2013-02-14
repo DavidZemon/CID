@@ -38,7 +38,7 @@ typedef uint16 OUT_TYPE;
 #define Z_PIN				GPIO_PIN_6
 
 // Buffer
-#define BUFFER_SIZE 		4				// Sample buffer size
+#define BUFFER_SIZE 		32				// Sample buffer size
 #define EMPTY				LONG_MAX		// EMPTY will represent an empty field
 #define AXES				3				// There are 3 axes: X, Y, and Z
 #define X					0				// First step of the sequencer is the X-axis
@@ -57,8 +57,10 @@ typedef uint16 OUT_TYPE;
 #define BEAT_FREQ
 
 // RC High Pass Filter
-#define FILTER_RC			3.003			// R = 222k, C = 1.5uF, fc = 1/RC
-#define	ALPHA				FILTER_RC / (FILTER_RC + RD_FREQ)
+//#define FILTER_RC			3.003			// R = 222k, C = 1.5uF, fc = 1/RC
+//#define	ALPHA				FILTER_RC / (FILTER_RC + RD_FREQ)
+#define FILTER_RC			0.333
+#define	ALPHA				RD_FREQ / (FILTER_RC + RD_FREQ)
 
 // Alarm
 #define ALARM_SYSCTL		SYSCTL_PERIPH_GPIOG

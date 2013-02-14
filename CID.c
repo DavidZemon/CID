@@ -11,17 +11,14 @@ void main (void) {
 	sysInit();
 
 	// Test code to see if wave generator and ISRs work
-	/*g_wave.amp = 1;
+	g_wave.amp = 1;
 	 g_wave.freq = 220;
-	 while (1)
-	 if (BUFFER_SIZE - 1 <= g_buffer_in.size)
-	 g_buffer_in.size = 0;*/
 
 	while (1)
 		if (g_flag_newInput && !g_flag_calibration) {
 			g_flag_newInput = 0;
-			g_wave = dataProcessor(&g_buffer_in);
-		}
+//			g_wave = dataProcessor(&g_buffer_in);
+	}
 }
 
 void sysInit (void) {
@@ -298,25 +295,25 @@ struct wave dataProcessor (struct buffer *input) {
 	 * Find new amplitude and frequency *
 	 ***********************************/
 	// Find position as a percentage 0.0 - 1.0
-	if (output_min[FREQ_AXIS] == output_max[FREQ_AXIS])
-		// Avoid a divide-by-zero scenario
-		freqPos = 0.5;
-	else
-		freqPos = ((float) (outBuf->data[FREQ_AXIS][outBuf->rd_ptr]
-				- output_min[FREQ_AXIS]))
-				/ (output_max[FREQ_AXIS] - output_min[FREQ_AXIS]);
-	if (output_min[AMP_AXIS] == output_max[AMP_AXIS])
-		theWave.amp = 0.5;
-	else
-		// theWave.amp = ((float) (outBuf->data[AMP_AXIS][outBuf->rd_ptr] - output_min))
-		//	/ (output_max - output_min);
-		theWave.amp = 0.5;
+	/*if (output_min[FREQ_AXIS] == output_max[FREQ_AXIS])
+	 // Avoid a divide-by-zero scenario
+	 freqPos = 0.5;
+	 else
+	 freqPos = ((float) (outBuf->data[FREQ_AXIS][outBuf->rd_ptr]
+	 - output_min[FREQ_AXIS]))
+	 / (output_max[FREQ_AXIS] - output_min[FREQ_AXIS]);
+	 if (output_min[AMP_AXIS] == output_max[AMP_AXIS])
+	 theWave.amp = 0.5;
+	 else
+	 // theWave.amp = ((float) (outBuf->data[AMP_AXIS][outBuf->rd_ptr] - output_min))
+	 //	/ (output_max - output_min);
+	 theWave.amp = 0.5;
 
-	// Find indice of note
-	freqPos *= (MAX_OUT_IDX - MIN_OUT_IDX);
+	 // Find indice of note
+	 freqPos *= (MAX_OUT_IDX - MIN_OUT_IDX);
 
-	// Find frequency in Hz
-	theWave.freq = 40 * ((float) exp((double) 0.0888650234 * (double) freqPos)) - 12.5;
+	 // Find frequency in Hz
+	 theWave.freq = 40 * ((float) exp((double) 0.0888650234 * (double) freqPos)) - 12.5;*/
 
 	// Test values - directly proportional to input - not filtered or integrated
 	theWave.freq = (MAX_OUT_FREQ - MIN_OUT_FREQ)
@@ -385,7 +382,38 @@ void soundAlarm (const uint8 alarm, const int32 arg) {
 	}
 }
 
+/*void highPass (struct buffer *input, struct buffer *output) {
+ /* @Description: Filter accelerometer data for improved accuracy during integration
+ * 				Calculates most recent high pass filter (HPF) output based on previous
+ * 				HPF output sample and current and previous filter input samples
+ *
+ * 				Accel -> ADC -> HPF -> Integrator -> HPF -> Integrator -> HPF -> Position
+ */
+
+/*uint8 axis, curr_idx, prev_idx;
+
+ // Prepare correct previous sample indexes in circular buffer
+ curr_idx = (input->wr_ptr + BUFFER_SIZE - 1) % BUFFER_SIZE;
+ prev_idx = (input->wr_ptr + BUFFER_SIZE - 2) % BUFFER_SIZE;
+
+ // Perform HPF calculation for current samples on both position-dependent axes
+ for (axis = 0; axis < AXES; ++axis)
+ if (axis == FREQ_AXIS || axis == AMP_AXIS)
+ output->data[axis][output->wr_ptr] = ALPHA
+ * (output->data[axis][curr_idx] + input->data[axis][curr_idx]
+ - input->data[axis][prev_idx]);
+
+ // Loop the write pointer if it has reached the end of the buffer
+ if (BUFFER_SIZE == ++(output->wr_ptr))
+ output->wr_ptr = 0;
+
+ // Integration is next: subtract current sample from previous sample
+ }*/
+
 void highPass (struct buffer *input, struct buffer *output) {
+	//
+	//******* THIS IS ACTUALLY A LOW PASS FILTER *********************************
+	//
 	/* @Description: Filter accelerometer data for improved accuracy during integration
 	 * 				Calculates most recent high pass filter (HPF) output based on previous
 	 * 				HPF output sample and current and previous filter input samples
@@ -393,18 +421,17 @@ void highPass (struct buffer *input, struct buffer *output) {
 	 * 				Accel -> ADC -> HPF -> Integrator -> HPF -> Integrator -> HPF -> Position
 	 */
 
-	uint8 axis, curr_idx, prev_idx;
+	uint8 axis, /*curr_idx,*/prev_idx;
 
 	// Prepare correct previous sample indexes in circular buffer
-	curr_idx = (input->wr_ptr + BUFFER_SIZE - 1) % BUFFER_SIZE;
-	prev_idx = (input->wr_ptr + BUFFER_SIZE - 2) % BUFFER_SIZE;
+	//curr_idx = (output->wr_ptr + BUFFER_SIZE - 1) % BUFFER_SIZE;
+	prev_idx = (output->wr_ptr + BUFFER_SIZE - 2) % BUFFER_SIZE;
 
 	// Perform HPF calculation for current samples on both position-dependent axes
 	for (axis = 0; axis < AXES; ++axis)
 		if (axis == FREQ_AXIS || axis == AMP_AXIS)
-			output->data[axis][output->wr_ptr] = ALPHA
-					* (output->data[axis][curr_idx] + input->data[axis][curr_idx]
-							- input->data[axis][prev_idx]);
+			output->data[axis][output->wr_ptr] = output->data[axis][prev_idx] +
+			ALPHA * (output->data[axis][prev_idx] + input->data[axis][input->wr_ptr]);
 
 	// Loop the write pointer if it has reached the end of the buffer
 	if (BUFFER_SIZE == ++(output->wr_ptr))
@@ -449,6 +476,7 @@ void write_out_isr (void) {
 	/* Description: Interrupt service routine for Timer;
 	 * 				Write g_out_buffer to SPI (make sound through the DAC!)
 	 */
+	g_int_counter++;
 	static float mainPhase = EMPTY;
 	/*static float beatPhase = EMPTY;
 	 static uint32 beatIdx = 0;*/
@@ -466,6 +494,7 @@ void write_out_isr (void) {
 	 }*/
 
 	SSIDataPutNonBlocking(DAC_SSI_BASE, output << 2);
+
 }
 
 void adc_isr (void) {
