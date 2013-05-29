@@ -11,7 +11,7 @@
  *** Defines ***
  ***************/
 // ADC/Timer hardware
-#define RD_FREQ				50000			// Timer triggers at 50 kHz
+#define RD_FREQ				5000			// Timer triggers at 5 kHz
 #define ACCEL_ADC			0				// ADC in use for accelerometer
 #define SEQUENCE			1				// ADC Sequencer
 #define HARDWARE_AVERAGER	4				// Average 4 samples (choose from 2^1 through 2^4)
@@ -28,8 +28,8 @@
 #define Z_PIN				GPIO_PIN_6
 
 // Buffer
-#define IN_BUFF_TYPE		unsigned int
-#define OUT_BUFF_TYPE		unsigned short
+typedef unsigned int in_buff_type;
+typedef unsigned short out_buff_type;
 #define BUFFER_SIZE 		5				// Sample buffer size
 #define EMPTY				-1				// -1 will represent an empty field
 #define AXES				3				// There are 3 axes between X, Y, and Z
@@ -82,17 +82,20 @@
 /************************
  *** Global Variables ***
  ************************/
+typedef struct _buffer_in buffer_in;
+typedef struct _buffer_out buffer_out;
+
 // Input buffer (2D)
-struct buffer_in {
-		IN_BUFF_TYPE **data;
+struct _buffer_in {
+		in_buff_type **data;
 		unsigned short size;
 		unsigned short wr_ptr;
 		unsigned short rd_ptr;
 };
 
 // Output buffer (1D)
-struct buffer_out {
-		OUT_BUFF_TYPE *data;
+struct _buffer_out {
+		out_buff_type *data;
 		unsigned short size;
 		unsigned short wr_ptr;
 		unsigned short rd_ptr;

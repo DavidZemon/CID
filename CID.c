@@ -5,6 +5,9 @@
 
 #include "CID.h"
 
+buffer_in g_buffer_in;
+buffer_out g_buffer_out;
+
 void main (void) {
 	sysInit();
 
@@ -58,9 +61,9 @@ void adc_isr (void) {
 	++g_buffer_in.size;
 }
 
-void dataProcessor (const unsigned short newPts, struct buffer_in *input,
+void dataProcessor (const unsigned short newPts, buffer_in *input,
 		const unsigned short in_width, const unsigned short in_len,
-		struct buffer_out *output, const unsigned short out_len) {
+		buffer_out *output, const unsigned short out_len) {
 	/* Description: Perform signal processing on the input buffer to generate an output buffer
 	 * 				TODO: What kind of signal processing?
 	 *
@@ -79,8 +82,8 @@ void dataProcessor (const unsigned short newPts, struct buffer_in *input,
 	 */
 
 	// TODO: Is newPts necessary or can we just output a single value for each call of dataProcessor()?
-	static IN_BUFF_TYPE min;
-	static IN_BUFF_TYPE max;
+	static in_buff_type min;
+	static in_buff_type max;
 
 	// Set test values temporarily
 	unsigned int freq = 400;
@@ -114,8 +117,8 @@ void dataProcessor (const unsigned short newPts, struct buffer_in *input,
 		input->rd_ptr = 0;
 }
 
-OUT_BUFF_TYPE waveGenerator (const unsigned int freq, const float amp,
-		const OUT_BUFF_TYPE peakAmp, float *phase) {
+out_buff_type waveGenerator (const unsigned int freq, const float amp,
+		const out_buff_type peakAmp, float *phase) {
 	/* Description: Generate and return a single value of a wave (t = 0) for a wave with frequency 'freq',
 	 * 				amplitude 'amp', and phase 'phase'.
 	 *
