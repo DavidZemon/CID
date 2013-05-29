@@ -8,14 +8,15 @@
 /****************
  *** Includes ***
  ****************/
-#define PART_LM4F232H5QD
-#include <inc/lm4f232h5qd.h>
-//#define PART_LM4F120H5QR
-//#include <inc/lm4f120h5qr.h>
+#include <math.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+#include <inc/tm4c123gh6pm.h>
 
 #include <inc/hw_memmap.h>
 #include <inc/hw_types.h>
-#include <inc/hw_ints.h>
 
 #include <driverlib/sysctl.h>
 #include <driverlib/pin_map.h>
@@ -30,8 +31,6 @@
 #include <utils/ustdlib.h>
 
 #include "CID-globals.h"
-#include <math.h>
-#include <stdlib.h>
 
 /**********************************
  *** Interrupt Service Routines ***
@@ -42,14 +41,22 @@ void adc_isr (void);
 /*************************
  *** General functions ***
  *************************/
-void dataProcessor (const unsigned short newPts, struct buffer_in *input,
-		const unsigned short in_width, const unsigned short in_len,
-		struct buffer_out *output, const unsigned short out_len);
-OUT_BUFF_TYPE waveGenerator (const unsigned int freq, const float amp,
-		const OUT_BUFF_TYPE peakAmp, float *phase);
-void soundAlarm (const unsigned char alarm, const int arg);
+wave dataProcessor (buffer *input, const uint16 in_width, const uint16 in_len);
+
+out_type waveGenerator (const wave *par, const out_type peakAmp, float *phase);
+
+void soundAlarm (const uint8 alarm, const int32 arg);
+
+void doubleIntegrator (buffer input, in_type *freqPos, in_type *volPos);
+
+void highPass (buffer *input, buffer *output);
+
+void updateIntegrator (buffer *input, buffer *output);
+
+void bufferInit (buffer *buf, uint8 width, uint16 length, in_type initVal);
+
 #ifdef DEBUG
-void __error__(char *pcFilename, unsigned long ulLine) {}
+void __error__(int8 *pcFilename, unsigned long ulLine) {}
 #endif
 
 /********************************
@@ -59,5 +66,7 @@ void sysInit (void);
 void rdTmrInit (void);
 void adcInit (void);
 void spiInit (void);
+void alarmInit (void);
+void wrTmrInit (void);
 
 #endif /* CID_H_ */
